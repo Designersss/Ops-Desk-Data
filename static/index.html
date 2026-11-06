@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0f2730" />
+  <title>Ops Desk — панель операций</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <a class="brand" href="#overview" aria-label="Панель операций">
+      <span class="brand-mark">▦</span><span class="brand-words"><strong>ops<span class="brand-dot">.</span>desk</strong><small>DATA OPERATIONS</small></span>
+    </a>
+    <div class="nav-heading">Управление</div>
+    <nav id="main-nav" aria-label="Разделы приложения">
+      <a data-nav="overview" href="#overview"><span>◫</span> Панель руководителя</a>
+      <a data-nav="prep" href="#prep"><span>▤</span> Заготовка</a>
+      <a data-nav="weld" href="#weld"><span>⌁</span> Потребность сварки</a>
+      <a data-nav="docs" href="#docs"><span>▧</span> Документация</a>
+    </nav>
+    <div class="nav-heading second">Данные и контроль</div>
+    <nav aria-label="Данные">
+      <a data-nav="quality" href="#quality"><span>◇</span> Качество данных <small id="sidebar-alert"></small></a>
+      <a data-nav="import" href="#import"><span>⇧</span> Импорт Excel</a>
+    </nav>
+    <div class="sidebar-bottom"><span class="online-dot"></span> Локальная база SQLite <small>Без внешних интеграций</small></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar">
+      <div class="topbar-left"><span class="workspace-icon">▦</span><span>Производственные операции</span><span class="divider-vertical"></span><span class="topbar-muted">Демо-система</span></div>
+      <div class="topbar-controls">
+        <label>Период</label><input id="date-from" type="date" value="2026-10-05" aria-label="Дата начала" />
+        <span class="period-dash">—</span><input id="date-to" type="date" value="2026-10-14" aria-label="Дата конца" />
+        <button class="button button-secondary button-small" data-action="period">Применить</button>
+        <button class="button button-primary button-small" data-action="export"><span>↓</span> Скачать отчёт</button>
+      </div>
+    </header>
+    <main id="app" class="content" tabindex="-1"><div class="loading"><span class="spinner"></span> Загружаем данные…</div></main>
+    <footer class="footer"><span>Ops Desk · Тестовая демоверсия</span><span>Показатели пересчитываются из записей SQLite</span></footer>
+  </div>
+</div>
+<dialog id="editor-modal" class="modal">
+  <form id="editor-form" method="dialog">
+    <div class="modal-header"><div><div class="eyebrow">РАБОЧАЯ ЗАПИСЬ</div><h2 id="editor-title">Редактирование</h2></div><button class="close-icon" type="button" data-action="close-editor" aria-label="Закрыть">×</button></div>
+    <div id="editor-fields" class="field-grid"></div>
+    <p class="modal-note">Ошибочные и неполные данные можно сохранить для последующей проверки, но они не попадут в подтверждённые показатели.</p>
+    <div id="editor-error" class="form-error hidden" role="alert"></div>
+    <div class="modal-actions"><button class="button button-secondary" type="button" data-action="close-editor">Отмена</button><button class="button button-primary" type="submit">Сохранить запись</button></div>
+  </form>
+</dialog>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="/app.js" defer></script>
+</body>
+</html>
