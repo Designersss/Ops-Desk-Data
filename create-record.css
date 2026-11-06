@@ -16,7 +16,7 @@
 .create-field-control::placeholder{color:#abb4ac;font-weight:500}
 .create-field-control:hover{border-color:#bdcfc1}
 .create-field-control:focus{border-color:#799781;box-shadow:0 0 0 3px #e7efe7;outline:none}
-.create-field-control:invalid:not(:placeholder-shown):not(:focus){border-color:#d7a18b}
+.create-field-control:user-invalid{border-color:#d7a18b}
 .create-field-help{color:#98a39a;font-size:10px;font-weight:500;line-height:1.55}
 .create-inline-note{display:flex;align-items:flex-start;gap:9px;margin:24px 0 0;padding:13px 14px;border-radius:9px;background:#f3f7f2;color:#708272;font-size:10.4px;line-height:1.7}
 .create-inline-note .ico{width:15px;height:15px;flex:0 0 15px;margin-top:2px}
