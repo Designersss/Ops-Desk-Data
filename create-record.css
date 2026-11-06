@@ -1,0 +1,40 @@
+/* Создание записи — единая компоновка для трёх рабочих разделов PBS. */
+.create-record-page{display:flex;flex-direction:column;gap:16px}
+.create-record-back{align-self:flex-start;margin:0;padding:0 0 4px}
+.create-record-layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:20px;align-items:start}
+.create-record-main{min-width:0;display:flex;flex-direction:column;gap:17px}
+.create-card{min-width:0;padding:26px 28px 29px}
+.create-card-head{display:flex;align-items:flex-start;gap:13px;margin-bottom:26px}
+.create-card-step{display:grid;place-items:center;width:32px;height:32px;flex:0 0 32px;border-radius:9px;background:#eef4ed;color:#4d7054;font-size:10px;font-weight:850}
+.create-card-head h2{margin:0 0 7px;color:#293e30;font-size:14px;letter-spacing:-.3px;font-weight:800}
+.create-card-head p{margin:0;color:#94a095;font-size:11px;line-height:1.65}
+.create-field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:23px 18px}
+.create-field{min-width:0;display:flex;flex-direction:column;gap:8px}
+.create-field label{color:#526355;font-size:11px;font-weight:800;line-height:1.4}
+.create-required{color:#b8785a;padding-left:1px}
+.create-field-control{display:block;min-width:0;width:100%;height:44px;border-radius:9px;border:1px solid #e0e8df;background:#fff;padding:0 13px;color:#2b3e30;font-size:11.5px;font-weight:650;outline:0;transition:border-color .16s,box-shadow .16s}
+.create-field-control::placeholder{color:#abb4ac;font-weight:500}
+.create-field-control:hover{border-color:#bdcfc1}
+.create-field-control:focus{border-color:#799781;box-shadow:0 0 0 3px #e7efe7;outline:none}
+.create-field-control:invalid:not(:placeholder-shown):not(:focus){border-color:#d7a18b}
+.create-field-help{color:#98a39a;font-size:10px;font-weight:500;line-height:1.55}
+.create-inline-note{display:flex;align-items:flex-start;gap:9px;margin:24px 0 0;padding:13px 14px;border-radius:9px;background:#f3f7f2;color:#708272;font-size:10.4px;line-height:1.7}
+.create-inline-note .ico{width:15px;height:15px;flex:0 0 15px;margin-top:2px}
+.create-form-actions{display:flex;justify-content:flex-end;gap:10px;padding:4px 0 4px}
+.create-form-actions .btn{height:42px}
+.create-record-aside{display:flex;flex-direction:column;gap:16px}
+.create-aside-card{padding:24px 22px}
+.create-aside-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:#eff4ed;color:#617f68;margin-bottom:19px}
+.create-aside-icon .ico{width:21px;height:21px}
+.create-aside-card h3,.create-context-card h3{font-size:12px;letter-spacing:-.2px;font-weight:800;color:#293d2f;margin:0 0 8px}
+.create-aside-card p,.create-context-card p{margin:0;color:#8c998e;font-size:10.5px;line-height:1.85}
+.create-aside-divider{height:1px;background:#edf1eb;margin:20px 0}
+.create-aside-caption{color:#8da18f;font-size:9px;letter-spacing:.9px;font-weight:850;margin-bottom:8px}
+.create-context-card{display:flex;align-items:start;gap:11px;background:#edf3ed;border:1px solid #e4ece2;border-radius:14px;padding:19px 18px}
+.create-context-icon{color:#5d7d63;flex:0 0 19px;padding-top:1px}
+.create-context-icon .ico{width:18px;height:18px}
+.create-context-card h3{font-size:11px}
+.create-context-card p{color:#708473}
+@media(max-width:1180px){.create-record-layout{grid-template-columns:minmax(0,1fr) 240px;gap:14px}.create-card{padding:23px}.create-aside-card{padding:20px}}
+@media(max-width:1000px){.create-record-layout{grid-template-columns:minmax(0,1fr)}.create-record-aside{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.create-aside-card{padding:20px}.create-context-card{align-self:stretch}}
+@media(max-width:600px){.create-field-grid{grid-template-columns:minmax(0,1fr);gap:17px}.create-record-aside{grid-template-columns:1fr}.create-card{padding:20px 17px 23px}.create-card-head{margin-bottom:20px}.create-form-actions{gap:9px}.create-form-actions .btn{flex:1}.create-form-actions .btn-primary{padding:0 10px}.create-record-layout{gap:15px}}
