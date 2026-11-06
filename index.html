@@ -9,6 +9,7 @@
   <link rel="icon" href="assets/pbs-logo.webp" type="image/webp">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="detail.css">
+  <link rel="stylesheet" href="role-views.css">
 </head>
 <body>
   <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" class="svg-library">
@@ -45,26 +46,40 @@
         <button class="icon-btn collapse-btn" id="collapseBtn" aria-label="Свернуть меню" title="Свернуть меню"><svg class="ico"><use href="#i-panel"/></svg></button>
       </div>
       <div class="sidebar-body">
-        <div class="nav-label">РАБОЧЕЕ ПРОСТРАНСТВО</div>
-        <nav class="nav-group" aria-label="Основное меню">
+        <div class="nav-label director-only">РАБОЧЕЕ ПРОСТРАНСТВО</div>
+        <nav class="nav-group director-only" aria-label="Основное меню">
           <button class="nav-link active" data-page="overview" aria-current="page"><svg class="ico"><use href="#i-grid"/></svg><span>Обзор</span></button>
           <button class="nav-link" data-page="quality"><svg class="ico"><use href="#i-shield"/></svg><span>Качество данных</span><span class="nav-counter">5</span></button>
           <button class="nav-link" data-page="reports"><svg class="ico"><use href="#i-report"/></svg><span>Отчёты</span></button>
         </nav>
-        <div class="nav-label nav-label-spaced">ПРОИЗВОДСТВО</div>
+        <div class="nav-label nav-label-spaced" id="productionNavLabel">ПРОИЗВОДСТВО</div>
         <nav class="nav-group" aria-label="Производственные участки">
-          <button class="nav-link" data-page="preparation"><svg class="ico"><use href="#i-box"/></svg><span>Заготовка</span></button>
-          <button class="nav-link" data-page="welding"><svg class="ico"><use href="#i-weld"/></svg><span>Потребность сварки</span></button>
-          <button class="nav-link" data-page="documents"><svg class="ico"><use href="#i-files"/></svg><span>Документация</span></button>
+          <button class="nav-link production-link" data-page="preparation"><svg class="ico"><use href="#i-box"/></svg><span>Заготовка</span></button>
+          <button class="nav-link production-link" data-page="welding"><svg class="ico"><use href="#i-weld"/></svg><span>Потребность сварки</span></button>
+          <button class="nav-link production-link" data-page="documents"><svg class="ico"><use href="#i-files"/></svg><span>Документация</span></button>
         </nav>
       </div>
       <div class="sidebar-foot">
-        <button class="nav-link settings-link" data-page="settings"><svg class="ico"><use href="#i-settings"/></svg><span>Настройки</span></button>
+        <button class="nav-link settings-link director-only" data-page="settings"><svg class="ico"><use href="#i-settings"/></svg><span>Настройки</span></button>
+        <div class="role-selector" id="roleSelector">
+          <button type="button" class="role-trigger" id="roleTrigger" aria-expanded="false" aria-haspopup="listbox" aria-controls="roleMenu" title="Переключить роль">
+            <span class="role-avatar" id="roleAvatar">Д</span>
+            <span class="role-copy"><strong id="roleTitle">Директор</strong><small id="roleSubtitle">Все участки</small></span>
+            <svg class="ico role-chevron" aria-hidden="true"><use href="#i-down"/></svg>
+          </button>
+          <div class="role-menu hidden" id="roleMenu" role="listbox" aria-label="Выбор роли">
+            <div class="role-menu-heading">РЕЖИМ РАБОТЫ</div>
+            <button type="button" class="role-option selected" data-role="director" role="option" aria-selected="true"><span class="role-mark">Д</span><span class="role-option-copy"><strong>Директор</strong><small>Все участки и аналитика</small></span><svg class="ico role-option-check" aria-hidden="true"><use href="#i-check"/></svg></button>
+<button type="button" class="role-option" data-role="preparation" role="option" aria-selected="false"><span class="role-mark">З</span><span class="role-option-copy"><strong>Сотрудник · Заготовка</strong><small>Только заготовка</small></span><svg class="ico role-option-check" aria-hidden="true"><use href="#i-check"/></svg></button>
+<button type="button" class="role-option" data-role="welding" role="option" aria-selected="false"><span class="role-mark">С</span><span class="role-option-copy"><strong>Сотрудник · Сварка</strong><small>Только потребность сварки</small></span><svg class="ico role-option-check" aria-hidden="true"><use href="#i-check"/></svg></button>
+<button type="button" class="role-option" data-role="documents" role="option" aria-selected="false"><span class="role-mark">Д</span><span class="role-option-copy"><strong>Сотрудник · Документация</strong><small>Только документация</small></span><svg class="ico role-option-check" aria-hidden="true"><use href="#i-check"/></svg></button>
+          </div>
+        </div>
       </div>
     </aside>
     <div class="workspace">
       <header class="topbar">
-        <div class="topbar-left"><button class="icon-btn mobile-menu" id="mobileMenu" aria-label="Открыть меню"><svg class="ico"><use href="#i-menu"/></svg></button><div class="crumb-root">Рабочее пространство</div><svg class="ico crumb-chevron"><use href="#i-chevron"/></svg><strong id="crumbCurrent">Обзор</strong><span id="crumbDetailWrap" class="crumb-record-wrap hidden"><svg class="ico crumb-chevron"><use href="#i-chevron"/></svg><strong id="crumbDetail"></strong></span></div>
+        <div class="topbar-left"><button class="icon-btn mobile-menu" id="mobileMenu" aria-label="Открыть меню"><svg class="ico"><use href="#i-menu"/></svg></button><div class="crumb-root" id="crumbRoot">Рабочее пространство</div><svg class="ico crumb-chevron"><use href="#i-chevron"/></svg><strong id="crumbCurrent">Обзор</strong><span id="crumbDetailWrap" class="crumb-record-wrap hidden"><svg class="ico crumb-chevron"><use href="#i-chevron"/></svg><strong id="crumbDetail"></strong></span></div>
       </header>
       <main class="main-content" id="mainContent">
         <div class="content-container">
