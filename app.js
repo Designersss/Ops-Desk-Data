@@ -263,12 +263,14 @@ function importPage(){return `
 function resolveRoute(){
  const route=decodeURIComponent(location.hash.slice(1));
  if(pages[route])return {page:route,index:null};
+ const creating=/^(preparation|welding|documents)\/new$/.exec(route);
+ if(creating)return {page:creating[1],index:null,create:true};
  const match=/^(preparation|welding|documents)\/(\d+)$/.exec(route);
  if(match){const index=Number(match[2]);if(Number.isSafeInteger(index)&&index<records[match[1]].length)return {page:match[1],index};}
  return {page:'overview',index:null};
 }
 function navigate(path){
- if(!pages[path]&&!/^(preparation|welding|documents)\/\d+$/.test(path))return;
+ if(!pages[path]&&!/^(preparation|welding|documents)\/(?:\d+|new)$/.test(path))return;
  if(!canView(path.split('/')[0]))return;
  if(location.hash!==`#${path}`)location.hash=path;
  else renderPage();
@@ -281,19 +283,19 @@ function renderPage(){
   if(location.hash!=='#'+home)location.hash=home;
   return;
  }
- const p=pages[route.page],detail=route.index!==null,record=detail?records[route.page][route.index]:null;
+ const p=pages[route.page],creating=route.create===true,detail=route.index!==null,record=detail?records[route.page][route.index]:null;
  currentPage=route.page;
- $('#pageTitle').textContent=detail?record.id:p.title;
- $('#pageDescription').textContent=detail?`${p.short} · ${dateLabel(record.date)}`:p.desc;
+ $('#pageTitle').textContent=creating?'Добавить запись':detail?record.id:p.title;
+ $('#pageDescription').textContent=creating?`Новая запись · ${p.short}`:detail?`${p.short} · ${dateLabel(record.date)}`:p.desc;
  $('#crumbCurrent').textContent=p.short;
- $('#crumbDetail').textContent=detail?record.id:'';
- $('#crumbDetailWrap').classList.toggle('hidden',!detail);
- $('.page-eyebrow').innerHTML=`${isDirector()?p.eyebrow:'МОЙ УЧАСТОК'} <span class="eyebrow-separator">/</span> ${p.short.toUpperCase()}${detail?` <span class="eyebrow-separator">/</span> ЗАПИСЬ`:''}`;
- $('#pageBody').innerHTML=detail?recordDetailsPage(route.page,route.index):
+ $('#crumbDetail').textContent=creating?'Добавить запись':detail?record.id:'';
+ $('#crumbDetailWrap').classList.toggle('hidden',!(detail||creating));
+ $('.page-eyebrow').innerHTML=`${isDirector()?p.eyebrow:'МОЙ УЧАСТОК'} <span class="eyebrow-separator">/</span> ${p.short.toUpperCase()}${creating?` <span class="eyebrow-separator">/</span> НОВАЯ ЗАПИСЬ`:detail?` <span class="eyebrow-separator">/</span> ЗАПИСЬ`:''}`;
+ $('#pageBody').innerHTML=creating?createRecordPage(route.page):detail?recordDetailsPage(route.page,route.index):
    route.page==='overview'?overview():['preparation','welding','documents'].includes(route.page)?sectionPage(route.page):
    route.page==='quality'?qualityPage():route.page==='reports'?reportsPage():route.page==='import'?importPage():settingsPage();
- $('.heading-actions').classList.toggle('hidden',detail||!['overview','reports'].includes(route.page));
- document.title=`${detail?record.id+' — ':''}${p.short} — Петро Билдинг Системс`;
+ $('.heading-actions').classList.toggle('hidden',creating||detail||!['overview','reports'].includes(route.page));
+ document.title=`${creating?'Добавить запись — ':detail?record.id+' — ':''}${p.short} — Петро Билдинг Системс`;
  document.querySelectorAll('.nav-link').forEach(btn=>{const active=btn.dataset.page===(route.page==='import'?'settings':route.page);btn.classList.toggle('active',active);if(active)btn.setAttribute('aria-current','page');else btn.removeAttribute('aria-current')});
  $('#mainContent').scrollTop=0;
  $('#appShell').classList.remove('mobile-open');
@@ -305,11 +307,18 @@ function openIssue(i){if(!isDirector())return;const r=issueRows[i];if(!r)return;
 function openAction(action){if(!isDirector()&&['tableInfo','export','editIssue','importFiles'].includes(action))return;
  if(action==='tableInfo')openModal('МЕТОДОЛОГИЯ','Как читать показатели',`<p>Значения заготовки показаны только по подтверждённым записям. Некорректные факты исключены из достоверных расчётов.</p><p>Потребность сварки отображается отдельно. Если связанная партия заготовки ошибочна, обеспеченность нельзя считать определённой.</p><p>Документация не зависит от других участков.</p>`);
  else if(action==='export')openModal('ОТЧЁТНОСТЬ','Скачать отчёт',`<p>Выбранный период: <strong>${$('#periodLabel').textContent}</strong>.</p><label class="field-label" for="formatChoice">Формат файла</label><select class="form-input" id="formatChoice"><option>Excel (.xlsx)</option><option>CSV (.csv)</option></select>`,`<button class="btn btn-outline" data-close="modal">Отмена</button><button class="btn btn-primary" data-action="exportPreview">${elIcon('download')} Скачать отчёт</button>`);
- else if(action==='addRecord')openModal('НОВАЯ ЗАПИСЬ','Добавить запись',`<label class="field-label" for="recordId">Номер партии / документа</label><input class="form-input" id="recordId" placeholder="Например, P-009"><label class="field-label" for="recordDate">Дата</label><input class="form-input" type="date" id="recordDate" value="2026-10-15"><label class="field-label" for="recordValue">Значение</label><input class="form-input" type="number" id="recordValue" placeholder="0">`,`<button class="btn btn-outline" data-close="modal">Отмена</button><button class="btn btn-primary" data-action="savePreview">Сохранить</button>`);
+ else if(action==='addRecord'){if(['preparation','welding','documents'].includes(currentPage))navigate(currentPage+'/new');}
  else if(action==='editIssue')openModal('РЕДАКТИРОВАНИЕ','Исправить значение',`<label class="field-label" for="issueValue">Новое значение</label><input class="form-input" id="issueValue" type="number" placeholder="Введите значение">`,`<button class="btn btn-outline" data-close="modal">Отмена</button><button class="btn btn-primary" data-action="savePreview">Сохранить</button>`);
  else if(action==='filters')openModal('ФИЛЬТРЫ','Фильтрация записей',`<label class="field-label">Состояние записи</label><select class="form-input"><option>Все состояния</option><option>Подтверждено</option><option>Требует проверки</option></select><label class="field-label">Период</label><select class="form-input"><option>Все даты</option><option>Текущий месяц</option></select>`,`<button class="btn btn-outline" data-close="modal">Отмена</button><button class="btn btn-primary" data-action="filterPreview">Применить</button>`);
  else if(action==='importFiles')openImportModal();
 }
+document.addEventListener('submit',event=>{
+ const form=event.target;
+ if(form.id!=='newRecordForm')return;
+ event.preventDefault();
+ if(!canView(form.dataset.createType))return;
+ showToast('Сохранение новых записей будет подключено вместе с базой данных');
+});
 document.addEventListener('click',event=>{
  const roleOption=event.target.closest('[data-role]');
  if(roleOption){selectRole(roleOption.dataset.role);return;}
