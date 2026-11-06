@@ -15,6 +15,66 @@ let currentPage='overview';
 let chartMode='days';
 let toastTimeout;
 function openImportModal(){openModal('ИМПОРТ ДАННЫХ','Выбор Excel-файлов',`<p>Выберите файлы для трёх производственных участков.</p><div class="import-form">${[{name:'Заготовка',id:'prep'},{name:'Потребность сварки',id:'weld'},{name:'Документация',id:'doc'}].map(item=>`<label class="import-file-label"><span>${item.name}</span><input type="file" accept=".xlsx,.xls" aria-label="${item.name}" id="import-${item.id}"></label>`).join('')}</div><p class="import-warning">При повторной загрузке понадобится подтвердить замену существующих записей.</p>`,`<button class="btn btn-outline" data-close="modal">Отмена</button><button class="btn btn-primary" data-action="importPreview">Продолжить</button>`)}
+// Each record has its own route and is displayed by one reusable screen per section.
+// Static source values mirror the three provided Excel files; backend persistence is a later stage.
+const records = {
+  preparation: [
+    {id:'P-001',date:'2026-10-05',batch:'LOT-01',employee:'Анна Соколова',plan:100,fact:90},
+    {id:'P-002',date:'2026-10-06',batch:'LOT-02',employee:'Анна Соколова',plan:100,fact:100},
+    {id:'P-003',date:'2026-10-07',batch:'LOT-03',employee:'Иван Морозов',plan:100,fact:1200},
+    {id:'P-004',date:'2026-10-08',batch:'LOT-04',employee:'Иван Морозов',plan:100,fact:-5},
+    {id:'P-005',date:'2026-10-09',batch:'LOT-05',employee:'Анна Соколова',plan:100,fact:80},
+    {id:'P-005',date:'2026-10-09',batch:'LOT-05',employee:'Анна Соколова',plan:100,fact:80},
+    {id:'P-006',date:'2026-10-12',batch:'LOT-06',employee:'Иван Морозов',plan:100,fact:0},
+    {id:'P-007',date:'2026-10-13',batch:'LOT-07',employee:'Анна Соколова',plan:100,fact:null},
+    {id:'P-008',date:'2026-10-14',batch:'LOT-08',employee:'Иван Морозов',plan:100,fact:100},
+  ],
+  welding: [
+    {id:'W-001',date:'2026-10-05',batch:'LOT-01',need:110},
+    {id:'W-002',date:'2026-10-06',batch:'LOT-02',need:90},
+    {id:'W-003',date:'2026-10-07',batch:'LOT-03',need:130},
+    {id:'W-004',date:'2026-10-08',batch:'LOT-04',need:100},
+    {id:'W-005',date:'2026-10-09',batch:'LOT-05',need:100},
+    {id:'W-006',date:'2026-10-12',batch:'LOT-06',need:20},
+    {id:'W-007',date:'2026-10-13',batch:'LOT-07',need:100},
+    {id:'W-008',date:'2026-10-14',batch:'LOT-08',need:100},
+  ],
+  documents: [
+    {id:'D-001',date:'2026-10-05',employee:'Мария Лебедева',plan:5,fact:4},
+    {id:'D-002',date:'2026-10-06',employee:'Олег Волков',plan:4,fact:4},
+    {id:'D-003',date:'2026-10-07',employee:'Мария Лебедева',plan:5,fact:3},
+    {id:'D-004',date:'2026-10-09',employee:'Олег Волков',plan:3,fact:2},
+    {id:'D-005',date:'2026-10-12',employee:'Мария Лебедева',plan:4,fact:0},
+    {id:'D-006',date:'2026-10-14',employee:'Олег Волков',plan:5,fact:5},
+  ]
+};
+const numberLabel = (n, unit='ед.') => n === null || n === undefined ? 'Не заполнено' : `${n.toLocaleString('ru-RU')} ${unit}`;
+const dateLabel = date => new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(`${date}T12:00:00Z`));
+const dateShort = date => date.split('-').reverse().join('.');
+const routeFor = (type, index) => `${type}/${index}`;
+const validPrep = record => record.fact !== null && record.fact >= 0 && record.fact <= record.plan * 3 && records.preparation.filter(r => r.id === record.id).length === 1;
+const preparationMatches = batch => records.preparation.map((item,index)=>({item,index})).filter(({item})=>item.batch===batch);
+function stateFor(type,record){
+  if(type === 'preparation'){
+    if(records.preparation.filter(r=>r.id===record.id).length > 1) return {kind:'warn',label:'Дублирование',reason:'Идентификатор записи повторяется. Сопоставление партии со сваркой неоднозначно.'};
+    if(record.fact === null) return {kind:'warn',label:'Нет факта',reason:'Фактический объём не заполнен. Показатель нельзя считать подтверждённым.'};
+    if(record.fact < 0) return {kind:'bad',label:'Ошибка факта',reason:'Фактический объём отрицательный. Значение требует исправления.'};
+    if(record.fact > record.plan * 3) return {kind:'bad',label:'Проверить факт',reason:'Факт существенно превышает план. Данные требуют подтверждения.'};
+    return {kind:'good',label:'Подтверждено',reason:'В записи не обнаружено очевидных проблем качества.'};
+  }
+  if(type === 'welding'){
+    const matches=preparationMatches(record.batch);
+    if(matches.length !== 1 || !validPrep(matches[0].item)) return {kind:'bad',label:'Связанная ошибка',reason:'Данные связанной партии заготовки не подтверждены. Обеспеченность нельзя определять.'};
+    return matches[0].item.fact < record.need
+      ? {kind:'warn',label:'Недостаточно',reason:'Подтверждённый объём заготовки меньше потребности сварки.'}
+      : {kind:'good',label:'Обеспечено',reason:'Подтверждённого объёма заготовки достаточно для потребности сварки.'};
+  }
+  if(record.fact === 0) return {kind:'warn',label:'Без выполнения',reason:'Выполнение работ пока не зафиксировано.'};
+  if(record.fact < record.plan) return {kind:'warn',label:'Частично выполнено',reason:'Фактическое количество документов меньше запланированного.'};
+  return {kind:'good',label:'План выполнен',reason:'Фактическое количество документов соответствует плану.'};
+}
+const statusPill = state => `<span class="status status-${state.kind}">${state.label}</span>`;
+const displayValue = (value,unit='ед.') => value === null ? '<span class="detail-missing">Не заполнено</span>' : numberLabel(value,unit);
 const issueRows = [
   {id:'P-003',title:'Аномальный факт: 1 200 ед.',sub:'Заготовка · значение требует проверки',severity:'bad',impact:'Связанные партии сварки нельзя считать обеспеченными.'},
   {id:'P-005',title:'Повторяющийся идентификатор',sub:'Заготовка · возможный дубль записи',severity:'bad',impact:'Нельзя однозначно сопоставить партию со сваркой.'},
@@ -54,20 +114,83 @@ function renderChart(){return `<svg class="main-chart" viewBox="0 0 680 232" pre
   ${['01.10','03.10','05.10','07.10','09.10','11.10','13.10'].map((x,i)=>`<text class="chart-label" x="${36+i*104}" y="213">${x}</text>`).join('')}
   </svg><div class="chart-tooltip"><span>09 октября</span><br><strong>81,6%</strong> <span>выполнено</span></div>`}
 function normalRows(type){
- const isPrep=type==='preparation',isWeld=type==='welding';
- const data=isPrep?[
-  ['P-001','05.10.2026','100 ед.','95 ед.','Подтверждено','good'],['P-003','07.10.2026','120 ед.','1 200 ед.','Проверить','bad'],['P-005','09.10.2026','—','—','Дублирование','warn'],['P-007','11.10.2026','—','−5 ед.','Проверить','bad'],['P-008','13.10.2026','—','Не заполнено','Не заполнено','warn']]
- :isWeld?[
-  ['Партия 01','05.10.2026','100 ед.','—','Требует сверки','warn'],['Партия 02','06.10.2026','150 ед.','—','Требует сверки','warn'],['Партия 03','07.10.2026','180 ед.','—','Связанная ошибка','bad'],['Партия 04','08.10.2026','90 ед.','—','Требует сверки','warn']]
- :[
-  ['Документ 01','05.10.2026','Оформление','—','Отдельный учёт','good'],['Документ 02','06.10.2026','Согласование','—','Отдельный учёт','good'],['Документ 03','08.10.2026','Оформление','—','Отдельный учёт','good'],['Документ 04','12.10.2026','Проверка','—','Отдельный учёт','good']];
- return data.map((r,i)=>`<tr data-record="${i}" tabindex="0"><td class="name-cell">${r[0]}</td><td>${r[1]}</td><td class="num">${r[2]}</td><td class="num">${r[3]}</td><td><span class="status status-${r[5]}">${r[4]}</span></td><td>${elIcon('chevron','row-next')}</td></tr>`).join('');
+ const heading = type === 'preparation' ? ['ЗАПИСЬ','ДАТА','ПАРТИЯ','ПЛАН','ФАКТ','СОСТОЯНИЕ'] :
+   type === 'welding' ? ['ЗАПИСЬ','ДАТА','ПАРТИЯ','ПОТРЕБНОСТЬ','ОБЕСПЕЧЕННОСТЬ','СОСТОЯНИЕ'] :
+   ['ЗАПИСЬ','ДАТА','СОТРУДНИК','ПЛАН','ФАКТ','СОСТОЯНИЕ'];
+ const rows=records[type].map((r,i)=>{
+   const state=stateFor(type,r);
+   const balance=type === 'welding' ? preparationMatches(r.batch) : [];
+   const linkedFact = balance.length === 1 && validPrep(balance[0].item) ? balance[0].item.fact : null;
+   const cells = type==='preparation'
+     ? [r.id,dateShort(r.date),r.batch,numberLabel(r.plan),displayValue(r.fact)]
+     : type==='welding'
+     ? [r.id,dateShort(r.date),r.batch,numberLabel(r.need),linkedFact === null ? 'Не определена' : numberLabel(linkedFact)]
+     : [r.id,dateShort(r.date),r.employee,numberLabel(r.plan,'док.'),numberLabel(r.fact,'док.')];
+   return `<tr data-record="${i}" tabindex="0" aria-label="Открыть запись ${r.id}">${cells.map((cell,idx)=>`<td class="${idx===0?'name-cell':idx===3||idx===4?'num':''}">${cell}</td>`).join('')}<td>${statusPill(state)}</td><td>${elIcon('chevron','row-next')}</td></tr>`;
+ }).join('');
+ return {heading,rows};
 }
-function sectionPage(type){const name=pages[type].short,count={preparation:9,welding:8,documents:6}[type];return `
-  <div class="view-info-bar"><p>Всего записей в исходном файле: <strong>${count}</strong></p><button class="btn btn-primary" data-open="addRecord">${elIcon('plus')} Добавить запись</button></div>
+function sectionPage(type){
+ const name=pages[type].short, data=normalRows(type);
+ return `<div class="view-info-bar"><p>Всего записей: <strong>${records[type].length}</strong></p><button class="btn btn-primary" data-open="addRecord">${elIcon('plus')} Добавить запись</button></div>
   <section class="panel view-table"><div class="table-toolbar"><strong>Журнал · ${name}</strong><div class="table-toolbar-actions"><button class="subtle-action" data-open="filters">${elIcon('filter')} Фильтры</button></div></div>
-    <div class="table-wrap"><table class="data-table" id="recordsTable"><thead><tr><th>ЗАПИСЬ</th><th>ДАТА</th><th>${type==='preparation'?'ПЛАН':type==='welding'?'ПОТРЕБНОСТЬ':'ОПЕРАЦИЯ'}</th><th>ФАКТ</th><th>СОСТОЯНИЕ</th><th></th></tr></thead><tbody>${normalRows(type)}</tbody></table></div>
-  </section>`}
+   <div class="table-wrap"><table class="data-table" id="recordsTable"><thead><tr>${data.heading.map(title=>`<th>${title}</th>`).join('')}<th></th></tr></thead><tbody>${data.rows}</tbody></table></div>
+  </section>`;
+}
+function detailPair(label,value){return `<div class="detail-pair"><dt>${label}</dt><dd>${value}</dd></div>`;}
+function detailStat(label,value,hint='',extra=''){return `<div class="detail-stat"><span>${label}</span><strong class="${extra}">${value}</strong>${hint?`<small>${hint}</small>`:''}</div>`;}
+function recordDetailsPage(type,index){
+ const r=records[type][index];
+ if(!r)return sectionPage(type);
+ const state=stateFor(type,r), isPrep=type==='preparation',isWeld=type==='welding';
+ const linked=isPrep?records.welding.map((item,i)=>({item,index:i})).filter(({item})=>item.batch===r.batch):isWeld?preparationMatches(r.batch):[];
+ let stats='',fields='',relation='',note='';
+ if(isPrep){
+   const valid=validPrep(r);
+   stats=detailStat('План',numberLabel(r.plan),'Объём по записи')+detailStat('Факт',displayValue(r.fact),'Зафиксированное количество')+
+     detailStat('Выполнение',valid?`${Math.round(r.fact/r.plan*1000)/10}%`:'Не определено',valid?'Факт относительно плана':'Требуется проверка записи',!valid?'detail-stat-alert':'');
+   fields=detailPair('Номер записи',r.id)+detailPair('Дата',dateLabel(r.date))+detailPair('Партия',r.batch)+detailPair('Сотрудник',r.employee);
+   relation=linked.length?linked.map(({item,index:i})=>`<button class="related-record" data-go="${routeFor('welding',i)}"><span class="related-icon">${elIcon('weld')}</span><span><strong>${item.id}</strong><small>Потребность сварки · ${numberLabel(item.need)}</small></span>${elIcon('chevron')}</button>`).join(''):'<div class="detail-empty">Связанных заявок на сварку нет.</div>';
+   note=valid?'Показатели этой записи могут участвовать в расчёте обеспеченности связанной сварки.':'Связанные показатели сварки не следует считать достоверными до исправления данных.';
+ } else if(isWeld){
+   const source=linked.length===1?linked[0].item:null;
+   const fact=source&&validPrep(source)?source.fact:null;
+   const remainder=fact===null?null:Math.max(0,r.need-fact);
+   stats=detailStat('Потребность',numberLabel(r.need),'Необходимый объём')+
+      detailStat('Подтверждённая заготовка',fact===null?'Не определена':numberLabel(fact),fact===null?'Источник требует проверки':`Партия ${r.batch}`,fact===null?'detail-stat-alert':'')+
+      detailStat('Недостаток',remainder===null?'Не определён':numberLabel(remainder),remainder===null?'Расчёт приостановлен':remainder===0?'Потребность закрыта':'Не хватает материала');
+   fields=detailPair('Номер записи',r.id)+detailPair('Дата',dateLabel(r.date))+detailPair('Партия',r.batch)+detailPair('Участок','Потребность сварки');
+   relation=linked.length?linked.map(({item,index:i})=>`<button class="related-record" data-go="${routeFor('preparation',i)}"><span class="related-icon">${elIcon('box')}</span><span><strong>${item.id}</strong><small>Заготовка · факт: ${displayValue(item.fact)}</small></span>${elIcon('chevron')}</button>`).join(''):'<div class="detail-empty">Соответствующая партия заготовки не найдена.</div>';
+   note=fact===null?'Обеспеченность не рассчитывается, пока запись заготовки недостоверна или связь неоднозначна.':'Расчёт обеспеченности выполняется по подтверждённому факту заготовки той же партии.';
+ } else {
+   stats=detailStat('План',numberLabel(r.plan,'док.'),'Документов запланировано')+
+     detailStat('Факт',numberLabel(r.fact,'док.'),'Документов выполнено')+
+     detailStat('Выполнение',`${Math.round(r.fact/r.plan*1000)/10}%`,'Факт относительно плана');
+   fields=detailPair('Номер записи',r.id)+detailPair('Дата',dateLabel(r.date))+detailPair('Сотрудник',r.employee)+detailPair('Участок','Документация');
+   relation='<div class="detail-empty">Документация учитывается отдельно от заготовки и сварки.</div>';
+   note='Показатели документации рассчитываются независимо от производственных партий.';
+ }
+ return `<div class="record-detail">
+   <div class="record-detail-toolbar"><button class="back-link record-back" data-go="${type}">${elIcon('arrow-left')} К журналу «${pages[type].short}»</button><button class="btn btn-primary" data-edit-record="${index}">${elIcon('settings')} Редактировать запись</button></div>
+   <div class="record-detail-identity"><div><span class="record-detail-subline">${isPrep||isWeld?`Партия ${r.batch}`:'Документ'} · ${dateLabel(r.date)}</span><h2>${isPrep?'Показатели заготовки':isWeld?'Показатели потребности':'Показатели документации'}</h2><p>Запись № ${index+1} из ${records[type].length}</p></div>${statusPill(state)}</div>
+   <div class="record-stats">${stats}</div>
+   <div class="record-detail-grid"><section class="panel record-card"><div class="record-card-head"><h3>Основная информация</h3><p>Исходные данные записи</p></div><dl class="detail-fields">${fields}</dl></section>
+   <section class="panel record-card"><div class="record-card-head"><h3>Проверка данных</h3><p>Состояние записи и влияние на показатели</p></div>
+      <div class="record-quality"><div class="record-quality-status">${statusPill(state)}</div><p>${state.reason}</p></div></section>
+   </div>
+   <section class="panel record-card record-relations"><div class="record-card-head"><h3>${isPrep?'Связанная потребность сварки':isWeld?'Связанная заготовка':'Связанные данные'}</h3><p>${isPrep||isWeld?'Записи сопоставлены по номеру партии':'Самостоятельный участок учёта'}</p></div><div class="related-records">${relation}</div><p class="record-relation-note">${elIcon('info')} ${note}</p></section>
+  </div>`;
+}
+function openRecordEditor(type,index){
+ const r=records[type]?.[index];if(!r)return;
+ const fields=[['Номер записи','id',r.id,'text'],['Дата','date',r.date,'date']];
+ if(type!=='documents')fields.push(['Номер партии','batch',r.batch,'text']);
+ if(type!=='welding')fields.push(['Сотрудник','employee',r.employee,'text']);
+ if(type==='welding')fields.push(['Потребность, ед.','need',r.need,'number']);
+ else fields.push(['План', 'plan',r.plan,'number'],['Факт','fact',r.fact??'','number']);
+ const content=`<div class="detail-edit-form">${fields.map(([label,key,val,kind])=>`<label class="detail-edit-field"><span>${label}</span><input class="form-input" type="${kind}" value="${val}" name="${key}"${kind==='number'?' step="1"':''}></label>`).join('')}</div>`;
+ openModal('РЕДАКТИРОВАНИЕ ЗАПИСИ',`Редактировать ${r.id}`,content,`<button class="btn btn-outline" data-close="modal">Отмена</button><button class="btn btn-primary" data-action="savePreview">Сохранить</button>`);
+}
 function qualityPage(){return `<div class="small-intro">${elIcon('shield')}Ошибки заготовки не должны превращать показатели связанных партий сварки в «подтверждённые». Документация учитывается независимо.</div><section class="panel"><div class="panel-heading"><div><h2>Замечания к данным</h2><p>Замечания, выявленные в исходных данных</p></div><span class="quality-heading-right">5 замечаний</span></div><div class="quality-item-list">${issueRows.map((r,i)=>`<button class="quality-list-item" data-issue="${i}"><span class="issue-marker ${r.severity==='warn'?'soft':''}">${elIcon('alert')}</span><div><strong>${r.title}</strong><p>${r.sub} · ${r.impact}</p></div>${elIcon('chevron')}</button>`).join('')}</div></section>`}
 function reportsPage(){return `<section class="panel report-feature"><div><h2>Управленческая отчётность</h2><p>Единый отчёт по заготовке, сварке, документации и качеству данных за выбранный период.</p></div></section><div style="height:18px"></div><section class="config-grid"><article class="panel config-card"><strong>Сводка руководителя</strong><p>Ключевые показатели по участкам, состояние план/факт и отклонения.</p></article><article class="panel config-card"><strong>Качество данных</strong><p>Список замечаний, связанные показатели и первичные записи.</p></article></section>`}
 function settingsPage(){return `<section class="panel settings-overview">
@@ -90,9 +213,36 @@ function importPage(){return `
   </div></section>
   <section class="panel import-action-panel"><div><h2>Загрузить исходные файлы</h2><p>Для первоначальной настройки или повторной загрузки данных выберите по одному файлу для каждого участка. Повторная загрузка требует отдельного подтверждения, чтобы не потерять исправления.</p></div><button class="btn btn-primary" data-open="importFiles">${elIcon('upload')} Выбрать файлы</button></section>
   <div class="import-hint">${elIcon('info')} Изменение записей выполняется в разделах «Заготовка», «Потребность сварки» и «Документация».</div>`}
-function getPage(){let hash=location.hash.replace('#','');return pages[hash]?hash:'overview'}
-function navigate(page){if(!pages[page])return;if(location.hash!==`#${page}`)location.hash=page;renderPage();}
-function renderPage(){currentPage=getPage();const p=pages[currentPage];$('#pageTitle').textContent=p.title;$('#pageDescription').textContent=p.desc;$('#crumbCurrent').textContent=p.short;$('.page-eyebrow').innerHTML=`${p.eyebrow} <span class="eyebrow-separator">/</span> ${p.short.toUpperCase()}`;$('#pageBody').innerHTML=currentPage==='overview'?overview():['preparation','welding','documents'].includes(currentPage)?sectionPage(currentPage):currentPage==='quality'?qualityPage():currentPage==='reports'?reportsPage():currentPage==='import'?importPage():settingsPage();$('.heading-actions').classList.toggle('hidden',!['overview','reports'].includes(currentPage));document.title=`${p.short} — Петро Билдинг Системс`;document.querySelectorAll('.nav-link').forEach(btn=>{const active=btn.dataset.page===(currentPage==='import'?'settings':currentPage);btn.classList.toggle('active',active);if(active)btn.setAttribute('aria-current','page');else btn.removeAttribute('aria-current')});$('#mainContent').scrollTop=0;$('#appShell').classList.remove('mobile-open');}
+function resolveRoute(){
+ const route=decodeURIComponent(location.hash.slice(1));
+ if(pages[route])return {page:route,index:null};
+ const match=/^(preparation|welding|documents)\/(\d+)$/.exec(route);
+ if(match){const index=Number(match[2]);if(Number.isSafeInteger(index)&&index<records[match[1]].length)return {page:match[1],index};}
+ return {page:'overview',index:null};
+}
+function navigate(path){
+ if(!pages[path]&&!/^(preparation|welding|documents)\/\d+$/.test(path))return;
+ if(location.hash!==`#${path}`)location.hash=path;
+ else renderPage();
+}
+function renderPage(){
+ const route=resolveRoute(),p=pages[route.page],detail=route.index!==null,record=detail?records[route.page][route.index]:null;
+ currentPage=route.page;
+ $('#pageTitle').textContent=detail?record.id:p.title;
+ $('#pageDescription').textContent=detail?`${p.short} · ${dateLabel(record.date)}`:p.desc;
+ $('#crumbCurrent').textContent=p.short;
+ $('#crumbDetail').textContent=detail?record.id:'';
+ $('#crumbDetailWrap').classList.toggle('hidden',!detail);
+ $('.page-eyebrow').innerHTML=`${p.eyebrow} <span class="eyebrow-separator">/</span> ${p.short.toUpperCase()}${detail?` <span class="eyebrow-separator">/</span> ЗАПИСЬ`:''}`;
+ $('#pageBody').innerHTML=detail?recordDetailsPage(route.page,route.index):
+   route.page==='overview'?overview():['preparation','welding','documents'].includes(route.page)?sectionPage(route.page):
+   route.page==='quality'?qualityPage():route.page==='reports'?reportsPage():route.page==='import'?importPage():settingsPage();
+ $('.heading-actions').classList.toggle('hidden',detail||!['overview','reports'].includes(route.page));
+ document.title=`${detail?record.id+' — ':''}${p.short} — Петро Билдинг Системс`;
+ document.querySelectorAll('.nav-link').forEach(btn=>{const active=btn.dataset.page===(route.page==='import'?'settings':route.page);btn.classList.toggle('active',active);if(active)btn.setAttribute('aria-current','page');else btn.removeAttribute('aria-current')});
+ $('#mainContent').scrollTop=0;
+ $('#appShell').classList.remove('mobile-open');
+}
 function showToast(msg){const box=$('#toast');box.textContent=msg;box.classList.add('show');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>box.classList.remove('show'),3200)}
 function openModal(kicker,title,body,actions){$('#modalKicker').textContent=kicker;$('#modalTitle').textContent=title;$('#modalBody').innerHTML=body;$('#modalActions').innerHTML=actions||`<button class="btn btn-primary" data-close="modal">Понятно</button>`;$('#modalOverlay').classList.remove('hidden');$('#modalOverlay').setAttribute('aria-hidden','false');$('#modalClose').focus();}
 function closeModal(){const modal=$('#modalOverlay');modal.classList.add('hidden');modal.setAttribute('aria-hidden','true')}
@@ -107,7 +257,8 @@ function openAction(action){if(action==='tableInfo')openModal('МЕТОДОЛО�
 document.addEventListener('click',event=>{
  const nav=event.target.closest('[data-page],[data-go]');if(nav){navigate(nav.dataset.page||nav.dataset.go);closeModal();return}
  const issue=event.target.closest('[data-issue]');if(issue){openIssue(Number(issue.dataset.issue));return}
- const rec=event.target.closest('[data-record]');if(rec){openModal('ПЕРВИЧНАЯ ЗАПИСЬ','Просмотр записи',`<div class="form-row"><span>Раздел</span><strong>${pages[currentPage].short}</strong></div><div class="form-row"><span>Номер строки</span><strong>№ ${Number(rec.dataset.record)+1}</strong></div>`,`<button class="btn btn-outline" data-close="modal">Закрыть</button><button class="btn btn-primary" data-open="editIssue">Редактировать</button>`);return}
+ const rec=event.target.closest('[data-record]');if(rec){navigate(routeFor(currentPage,Number(rec.dataset.record)));return}
+ const edit=event.target.closest('[data-edit-record]');if(edit){openRecordEditor(currentPage,Number(edit.dataset.editRecord));return}
  const open=event.target.closest('[data-open]');if(open){openAction(open.dataset.open);return}
  const close=event.target.closest('[data-close]');if(close){closeModal();return}
  const act=event.target.closest('[data-action]');if(act){closeModal();showToast(act.dataset.action==='exportPreview'?'Экспорт ещё не подключён':act.dataset.action==='importPreview'?'Выбранные файлы не загружены: импорт ещё не подключён':'Изменения пока не сохраняются');return}
