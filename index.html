@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f7f8f6">
   <title>Петро Билдинг Системс — Панель управления</title>
-  <meta name="description" content="Дизайн-прототип операционной панели Петро Билдинг Системс">
+  <meta name="description" content="Операционная панель управления Петро Билдинг Системс">
   <link rel="icon" href="assets/pbs-logo.webp" type="image/webp">
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -22,20 +22,18 @@
     <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
     <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 17v3h16v-3"/></symbol>
-    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="7.3"/><path d="m16 16 5 5"/></symbol>
-    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4"/></symbol>
     <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
     <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></symbol>
     <symbol id="i-trend" viewBox="0 0 24 24"><path d="m3 17 7-7 4 4 7-7m-6 0h6v6"/></symbol>
     <symbol id="i-alert" viewBox="0 0 24 24"><path d="m10.3 3-8.5 15a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3a2 2 0 0 0-3.4 0Z"/><path d="M12 9v5m0 3h.01"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
-    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
     <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 11v5m0-8h.01"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
     <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 7h16M7 12h10m-7 5h4"/></symbol>
     <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7m-7 7h14"/></symbol>
-    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 16v4h16v-4"/></symbol>
   </svg>
   <div class="app-shell" id="appShell">
     <div class="mobile-backdrop" id="mobileBackdrop"></div>
@@ -61,30 +59,22 @@
       </div>
       <div class="sidebar-foot">
         <button class="nav-link settings-link" data-page="settings"><svg class="ico"><use href="#i-settings"/></svg><span>Настройки</span></button>
-        <div class="user-card"><div class="user-avatar">Р</div><div class="user-copy"><strong>Руководитель</strong><small>Демо-просмотр</small></div><svg class="ico user-more"><use href="#i-more"/></svg></div>
       </div>
     </aside>
     <div class="workspace">
       <header class="topbar">
         <div class="topbar-left"><button class="icon-btn mobile-menu" id="mobileMenu" aria-label="Открыть меню"><svg class="ico"><use href="#i-menu"/></svg></button><div class="crumb-root">Рабочее пространство</div><svg class="ico crumb-chevron"><use href="#i-chevron"/></svg><strong id="crumbCurrent">Обзор</strong></div>
-        <div class="topbar-right">
-          <span class="demo-chip"><span class="demo-chip-dot"></span> Дизайн-прототип</span>
-          <button class="header-icon" id="searchTrigger" aria-label="Быстрый переход" title="Быстрый переход (⌘ K)"><svg class="ico"><use href="#i-search"/></svg></button>
-          <button class="header-icon bell-button" id="notificationsTrigger" aria-label="Уведомления"><svg class="ico"><use href="#i-bell"/></svg><span class="notification-dot"></span></button>
-          <span class="header-separator"></span><div class="header-avatar" title="Руководитель">Р</div>
-        </div>
       </header>
       <main class="main-content" id="mainContent">
         <div class="content-container">
           <div class="page-heading"><div><div class="page-eyebrow">ОПЕРАЦИОННАЯ АНАЛИТИКА <span class="eyebrow-separator">/</span> ОБЩАЯ СВОДКА</div><h1 id="pageTitle">Обзор предприятия</h1><p id="pageDescription">Все ключевые показатели производства в одном месте.</p></div><div class="heading-actions"><div class="dropdown-wrap"><button class="btn btn-outline period-button" id="periodTrigger" aria-expanded="false"><svg class="ico"><use href="#i-calendar"/></svg><span id="periodLabel">Весь период</span><svg class="ico small-chevron"><use href="#i-down"/></svg></button><div class="dropdown-menu hidden" id="periodMenu" role="menu"><button data-period="Весь период" class="selected">Весь период</button><button data-period="Последние 7 дней">Последние 7 дней</button><button data-period="Последние 30 дней">Последние 30 дней</button><button data-period="Произвольный период">Произвольный период</button></div></div><button class="btn btn-primary" id="exportTrigger"><svg class="ico"><use href="#i-download"/></svg><span>Скачать отчёт</span></button></div></div>
           <div id="pageBody"></div>
-          <footer class="main-footer"><span>© 2026 Петро Билдинг Системс</span><span>Дизайн-концепт v0.1 · Без подключения к данным</span></footer>
+          <footer class="main-footer"><span>© 2026 Петро Билдинг Системс</span></footer>
         </div>
       </main>
     </div>
   </div>
-  <div class="modal-overlay hidden" id="modalOverlay" aria-hidden="true"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-header"><div><div class="modal-kicker" id="modalKicker">ПРОТОТИП</div><h2 id="modalTitle">Детали</h2></div><button class="icon-btn" id="modalClose" aria-label="Закрыть"><svg class="ico"><use href="#i-close"/></svg></button></div><div class="modal-body" id="modalBody"></div><div class="modal-actions" id="modalActions"></div></div></div>
-  <div class="search-overlay hidden" id="searchOverlay" aria-hidden="true"><div class="search-dialog" role="dialog" aria-modal="true" aria-label="Быстрый переход"><div class="search-input-wrap"><svg class="ico"><use href="#i-search"/></svg><input id="searchInput" placeholder="Найти раздел или действие..." autocomplete="off"><kbd>ESC</kbd></div><div class="search-list" id="searchResults"></div><div class="search-footer">Навигация по разделам · Демонстрационный режим</div></div></div>
+  <div class="modal-overlay hidden" id="modalOverlay" aria-hidden="true"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-header"><div><div class="modal-kicker" id="modalKicker">ДЕТАЛИ</div><h2 id="modalTitle">Детали</h2></div><button class="icon-btn" id="modalClose" aria-label="Закрыть"><svg class="ico"><use href="#i-close"/></svg></button></div><div class="modal-body" id="modalBody"></div><div class="modal-actions" id="modalActions"></div></div></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="app.js" defer></script>
 </body>
