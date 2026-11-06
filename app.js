@@ -10,6 +10,48 @@ const pages = {
   settings:{title:'Настройки',short:'Настройки',eyebrow:'СИСТЕМА',desc:'Загрузка и состояние производственных данных.'},
   import:{title:'Импорт данных',short:'Импорт данных',eyebrow:'СИСТЕМА',desc:'Первоначальная загрузка данных из трёх Excel-файлов.'},
 };
+
+// Role selection affects the visible screens only; the backend will enforce access rights later.
+const roleProfiles={
+ director:{title:'Директор',subtitle:'Все участки',mark:'Д',home:'overview'},
+ preparation:{title:'Сотрудник',subtitle:'Заготовка',mark:'З',home:'preparation'},
+ welding:{title:'Сотрудник',subtitle:'Потребность сварки',mark:'С',home:'welding'},
+ documents:{title:'Сотрудник',subtitle:'Документация',mark:'Д',home:'documents'}
+};
+let activeRole='director';
+try{const stored=localStorage.getItem('pbs-view-role');if(roleProfiles[stored])activeRole=stored;}catch(error){}
+const isDirector=()=>activeRole==='director';
+const canView=page=>isDirector()||page===activeRole;
+function closeRoleMenu(){
+ $('#roleMenu').classList.add('hidden');
+ $('#roleTrigger').setAttribute('aria-expanded','false');
+}
+function syncRoleUi(){
+ const profile=roleProfiles[activeRole],director=isDirector();
+ $('#appShell').classList.toggle('employee-mode',!director);
+ document.querySelectorAll('.director-only').forEach(el=>el.classList.toggle('hidden',!director));
+ document.querySelectorAll('.production-link').forEach(el=>el.classList.toggle('hidden',!director&&el.dataset.page!==activeRole));
+ $('#productionNavLabel').textContent=director?'ПРОИЗВОДСТВО':'МОЙ УЧАСТОК';
+ $('#roleTitle').textContent=profile.title;
+ $('#roleSubtitle').textContent=profile.subtitle;
+ $('#roleAvatar').textContent=profile.mark;
+ $('#crumbRoot').textContent=director?'Рабочее пространство':'Мой участок';
+ $('#roleMenu').querySelectorAll('[data-role]').forEach(el=>{
+  const selected=el.dataset.role===activeRole;
+  el.classList.toggle('selected',selected);
+  el.setAttribute('aria-selected',String(selected));
+ });
+}
+function selectRole(role){
+ if(!roleProfiles[role])return;
+ activeRole=role;
+ try{localStorage.setItem('pbs-view-role',activeRole);}catch(error){}
+ closeRoleMenu();
+ closeModal();
+ syncRoleUi();
+ navigate(roleProfiles[activeRole].home);
+}
+
 const elIcon = (id, cls='ico') => `<svg class="${cls}" aria-hidden="true"><use href="#i-${id}"/></svg>`;
 let currentPage='overview';
 let chartMode='days';
@@ -132,7 +174,7 @@ function normalRows(type){
 }
 function sectionPage(type){
  const name=pages[type].short, data=normalRows(type);
- return `<div class="view-info-bar"><p>Всего записей: <strong>${records[type].length}</strong></p><button class="btn btn-primary" data-open="addRecord">${elIcon('plus')} Добавить запись</button></div>
+ return `${productionAnalytics(type)}<div class="view-info-bar"><p>Всего записей: <strong>${records[type].length}</strong></p><button class="btn btn-primary" data-open="addRecord">${elIcon('plus')} Добавить запись</button></div>
   <section class="panel view-table"><div class="table-toolbar"><strong>Журнал · ${name}</strong><div class="table-toolbar-actions"><button class="subtle-action" data-open="filters">${elIcon('filter')} Фильтры</button></div></div>
    <div class="table-wrap"><table class="data-table" id="recordsTable"><thead><tr>${data.heading.map(title=>`<th>${title}</th>`).join('')}<th></th></tr></thead><tbody>${data.rows}</tbody></table></div>
   </section>`;
@@ -170,6 +212,10 @@ function recordDetailsPage(type,index){
    relation='<div class="detail-empty">Документация учитывается отдельно от заготовки и сварки.</div>';
    note='Показатели документации рассчитываются независимо от производственных партий.';
  }
+ if(!isDirector() && (isPrep||isWeld)){
+  relation='<div class="detail-empty">Записи другого участка доступны директору. Состояние связанного расчёта приведено выше.</div>';
+  note='Из рабочего кабинета сотрудника можно открывать только записи своего участка.';
+ }
  return `<div class="record-detail">
    <div class="record-detail-toolbar"><button class="back-link record-back" data-go="${type}">${elIcon('arrow-left')} К журналу «${pages[type].short}»</button><button class="btn btn-primary" data-edit-record="${index}">${elIcon('settings')} Редактировать запись</button></div>
    <div class="record-detail-identity"><div><span class="record-detail-subline">${isPrep||isWeld?`Партия ${r.batch}`:'Документ'} · ${dateLabel(r.date)}</span><h2>${isPrep?'Показатели заготовки':isWeld?'Показатели потребности':'Показатели документации'}</h2><p>Запись № ${index+1} из ${records[type].length}</p></div>${statusPill(state)}</div>
@@ -182,6 +228,7 @@ function recordDetailsPage(type,index){
   </div>`;
 }
 function openRecordEditor(type,index){
+ if(!canView(type))return;
  const r=records[type]?.[index];if(!r)return;
  const fields=[['Номер записи','id',r.id,'text'],['Дата','date',r.date,'date']];
  if(type!=='documents')fields.push(['Номер партии','batch',r.batch,'text']);
@@ -222,18 +269,26 @@ function resolveRoute(){
 }
 function navigate(path){
  if(!pages[path]&&!/^(preparation|welding|documents)\/\d+$/.test(path))return;
+ if(!canView(path.split('/')[0]))return;
  if(location.hash!==`#${path}`)location.hash=path;
  else renderPage();
 }
 function renderPage(){
- const route=resolveRoute(),p=pages[route.page],detail=route.index!==null,record=detail?records[route.page][route.index]:null;
+ const route=resolveRoute();
+ syncRoleUi();
+ if(!canView(route.page)){
+  const home=roleProfiles[activeRole].home;
+  if(location.hash!=='#'+home)location.hash=home;
+  return;
+ }
+ const p=pages[route.page],detail=route.index!==null,record=detail?records[route.page][route.index]:null;
  currentPage=route.page;
  $('#pageTitle').textContent=detail?record.id:p.title;
  $('#pageDescription').textContent=detail?`${p.short} · ${dateLabel(record.date)}`:p.desc;
  $('#crumbCurrent').textContent=p.short;
  $('#crumbDetail').textContent=detail?record.id:'';
  $('#crumbDetailWrap').classList.toggle('hidden',!detail);
- $('.page-eyebrow').innerHTML=`${p.eyebrow} <span class="eyebrow-separator">/</span> ${p.short.toUpperCase()}${detail?` <span class="eyebrow-separator">/</span> ЗАПИСЬ`:''}`;
+ $('.page-eyebrow').innerHTML=`${isDirector()?p.eyebrow:'МОЙ УЧАСТОК'} <span class="eyebrow-separator">/</span> ${p.short.toUpperCase()}${detail?` <span class="eyebrow-separator">/</span> ЗАПИСЬ`:''}`;
  $('#pageBody').innerHTML=detail?recordDetailsPage(route.page,route.index):
    route.page==='overview'?overview():['preparation','welding','documents'].includes(route.page)?sectionPage(route.page):
    route.page==='quality'?qualityPage():route.page==='reports'?reportsPage():route.page==='import'?importPage():settingsPage();
@@ -246,8 +301,9 @@ function renderPage(){
 function showToast(msg){const box=$('#toast');box.textContent=msg;box.classList.add('show');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>box.classList.remove('show'),3200)}
 function openModal(kicker,title,body,actions){$('#modalKicker').textContent=kicker;$('#modalTitle').textContent=title;$('#modalBody').innerHTML=body;$('#modalActions').innerHTML=actions||`<button class="btn btn-primary" data-close="modal">Понятно</button>`;$('#modalOverlay').classList.remove('hidden');$('#modalOverlay').setAttribute('aria-hidden','false');$('#modalClose').focus();}
 function closeModal(){const modal=$('#modalOverlay');modal.classList.add('hidden');modal.setAttribute('aria-hidden','true')}
-function openIssue(i){const r=issueRows[i];if(!r)return;openModal('КАЧЕСТВО ДАННЫХ',r.title,`<div class="form-row"><span>Источник</span><strong>${r.sub.split(' · ')[0]}</strong></div><div class="form-row"><span>Запись</span><strong>${r.id}</strong></div><div class="form-row"><span>Влияние</span><strong style="max-width:210px;text-align:right">${r.impact}</strong></div>`,`<button class="btn btn-outline" data-close="modal">Закрыть</button><button class="btn btn-primary" data-open="editIssue">Исправить запись ${elIcon('chevron')}</button>`)}
-function openAction(action){if(action==='tableInfo')openModal('МЕТОДОЛОГИЯ','Как читать показатели',`<p>Значения заготовки показаны только по подтверждённым записям. Некорректные факты исключены из достоверных расчётов.</p><p>Потребность сварки отображается отдельно. Если связанная партия заготовки ошибочна, обеспеченность нельзя считать определённой.</p><p>Документация не зависит от других участков.</p>`);
+function openIssue(i){if(!isDirector())return;const r=issueRows[i];if(!r)return;openModal('КАЧЕСТВО ДАННЫХ',r.title,`<div class="form-row"><span>Источник</span><strong>${r.sub.split(' · ')[0]}</strong></div><div class="form-row"><span>Запись</span><strong>${r.id}</strong></div><div class="form-row"><span>Влияние</span><strong style="max-width:210px;text-align:right">${r.impact}</strong></div>`,`<button class="btn btn-outline" data-close="modal">Закрыть</button><button class="btn btn-primary" data-open="editIssue">Исправить запись ${elIcon('chevron')}</button>`)}
+function openAction(action){if(!isDirector()&&['tableInfo','export','editIssue','importFiles'].includes(action))return;
+ if(action==='tableInfo')openModal('МЕТОДОЛОГИЯ','Как читать показатели',`<p>Значения заготовки показаны только по подтверждённым записям. Некорректные факты исключены из достоверных расчётов.</p><p>Потребность сварки отображается отдельно. Если связанная партия заготовки ошибочна, обеспеченность нельзя считать определённой.</p><p>Документация не зависит от других участков.</p>`);
  else if(action==='export')openModal('ОТЧЁТНОСТЬ','Скачать отчёт',`<p>Выбранный период: <strong>${$('#periodLabel').textContent}</strong>.</p><label class="field-label" for="formatChoice">Формат файла</label><select class="form-input" id="formatChoice"><option>Excel (.xlsx)</option><option>CSV (.csv)</option></select>`,`<button class="btn btn-outline" data-close="modal">Отмена</button><button class="btn btn-primary" data-action="exportPreview">${elIcon('download')} Скачать отчёт</button>`);
  else if(action==='addRecord')openModal('НОВАЯ ЗАПИСЬ','Добавить запись',`<label class="field-label" for="recordId">Номер партии / документа</label><input class="form-input" id="recordId" placeholder="Например, P-009"><label class="field-label" for="recordDate">Дата</label><input class="form-input" type="date" id="recordDate" value="2026-10-15"><label class="field-label" for="recordValue">Значение</label><input class="form-input" type="number" id="recordValue" placeholder="0">`,`<button class="btn btn-outline" data-close="modal">Отмена</button><button class="btn btn-primary" data-action="savePreview">Сохранить</button>`);
  else if(action==='editIssue')openModal('РЕДАКТИРОВАНИЕ','Исправить значение',`<label class="field-label" for="issueValue">Новое значение</label><input class="form-input" id="issueValue" type="number" placeholder="Введите значение">`,`<button class="btn btn-outline" data-close="modal">Отмена</button><button class="btn btn-primary" data-action="savePreview">Сохранить</button>`);
@@ -255,6 +311,15 @@ function openAction(action){if(action==='tableInfo')openModal('МЕТОДОЛО�
  else if(action==='importFiles')openImportModal();
 }
 document.addEventListener('click',event=>{
+ const roleOption=event.target.closest('[data-role]');
+ if(roleOption){selectRole(roleOption.dataset.role);return;}
+ if(event.target.closest('#roleTrigger')){
+  const menu=$('#roleMenu');
+  menu.classList.toggle('hidden');
+  $('#roleTrigger').setAttribute('aria-expanded',String(!menu.classList.contains('hidden')));
+  return;
+ }
+ if(!event.target.closest('#roleSelector'))closeRoleMenu();
  const nav=event.target.closest('[data-page],[data-go]');if(nav){navigate(nav.dataset.page||nav.dataset.go);closeModal();return}
  const issue=event.target.closest('[data-issue]');if(issue){openIssue(Number(issue.dataset.issue));return}
  const rec=event.target.closest('[data-record]');if(rec){navigate(routeFor(currentPage,Number(rec.dataset.record)));return}
@@ -266,7 +331,7 @@ document.addEventListener('click',event=>{
  if(event.target.id==='periodTrigger'||event.target.closest('#periodTrigger')){const menu=$('#periodMenu');menu.classList.toggle('hidden');$('#periodTrigger').setAttribute('aria-expanded',String(!menu.classList.contains('hidden')));return}
  if(!event.target.closest('#periodMenu')){$('#periodMenu').classList.add('hidden');$('#periodTrigger').setAttribute('aria-expanded','false')}
 });
-document.addEventListener('keydown',event=>{if(event.key==='Escape'){closeModal();$('#periodMenu').classList.add('hidden')}if(event.key==='Enter'&&event.target.matches('[data-record],[data-issue],tr[data-go],article[data-go]'))event.target.click()});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'){closeModal();closeRoleMenu();$('#periodMenu').classList.add('hidden')}if(event.key==='Enter'&&event.target.matches('[data-record],[data-issue],tr[data-go],article[data-go]'))event.target.click()});
 $('#mobileMenu').addEventListener('click',()=>$('#appShell').classList.toggle('mobile-open'));
 $('#mobileBackdrop').addEventListener('click',()=>$('#appShell').classList.remove('mobile-open'));
 $('#collapseBtn').addEventListener('click',()=>$('#appShell').classList.toggle('collapsed'));
