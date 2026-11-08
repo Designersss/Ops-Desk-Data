@@ -155,36 +155,56 @@ function renderChart(){return `<svg class="main-chart" viewBox="0 0 680 232" pre
   <circle class="chart-point" cx="452" cy="64" r="5"/><path d="M452 70v110" stroke="#a8bbae" stroke-dasharray="4 5" stroke-width="1"/>
   ${['01.10','03.10','05.10','07.10','09.10','11.10','13.10'].map((x,i)=>`<text class="chart-label" x="${36+i*104}" y="213">${x}</text>`).join('')}
   </svg><div class="chart-tooltip"><span>09 октября</span><br><strong>81,6%</strong> <span>выполнено</span></div>`}
+function escapeJournalText(value){
+ return String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+function journalEmployeeCell(value){
+ const name=String(value||'').trim()||'Не указан';
+ return '<span class="journal-employee-name" title="'+escapeJournalText(name)+'" aria-label="'+escapeJournalText(name)+'">'+escapeJournalText(name)+'</span>';
+}
+function journalEmployeeOptions(type){
+ const employees=[...new Set(records[type].map(r=>String(r.employee||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
+ const hasUnassigned=records[type].some(r=>!String(r.employee||'').trim());
+ return '<option value="all">Все сотрудники</option>'
+  +employees.map(name=>'<option value="'+encodeURIComponent(name)+'">'+escapeJournalText(name)+'</option>').join('')
+  +(hasUnassigned?'<option value="unassigned">Не указан</option>':'');
+}
 function normalRows(type){
- const heading = type === 'preparation' ? ['ЗАПИСЬ','ДАТА','ПАРТИЯ','ПЛАН','ФАКТ','СОСТОЯНИЕ'] :
-   type === 'welding' ? ['ЗАПИСЬ','ДАТА','ПАРТИЯ','ПОТРЕБНОСТЬ','ОБЕСПЕЧЕННОСТЬ','СОСТОЯНИЕ'] :
-   ['ЗАПИСЬ','ДАТА','СОТРУДНИК','ПЛАН','ФАКТ','СОСТОЯНИЕ'];
+ const heading=type==='preparation'
+   ? ['ЗАПИСЬ','ДАТА','СОТРУДНИК','ПАРТИЯ','ПЛАН','ФАКТ','СОСТОЯНИЕ']
+   :type==='welding'
+   ? ['ЗАПИСЬ','ДАТА','СОТРУДНИК','ПАРТИЯ','ПОТРЕБНОСТЬ','ОБЕСПЕЧЕННОСТЬ','СОСТОЯНИЕ']
+   :['ЗАПИСЬ','ДАТА','СОТРУДНИК','ПЛАН','ФАКТ','СОСТОЯНИЕ'];
  const rows=records[type].map((r,i)=>{
    const state=stateFor(type,r);
-   const balance=type === 'welding' ? preparationMatches(r.batch) : [];
-   const linkedFact = balance.length === 1 && validPrep(balance[0].item) ? balance[0].item.fact : null;
-   const cells = type==='preparation'
-     ? [r.id,dateShort(r.date),r.batch,numberLabel(r.plan),displayValue(r.fact)]
-     : type==='welding'
-     ? [r.id,dateShort(r.date),r.batch,numberLabel(r.need),linkedFact === null ? 'Не определена' : numberLabel(linkedFact)]
-     : [r.id,dateShort(r.date),r.employee,numberLabel(r.plan,'док.'),numberLabel(r.fact,'док.')];
-   return `<tr data-record="${i}" data-filter-status="${state.kind}" data-filter-date="${r.date}" tabindex="0" aria-label="Открыть запись ${r.id}">${cells.map((cell,idx)=>`<td class="${idx===0?'name-cell':idx===3||idx===4?'num':''}">${cell}</td>`).join('')}<td>${statusPill(state)}</td><td>${elIcon('chevron','row-next')}</td></tr>`;
+   const matches=type==='welding'?preparationMatches(r.batch):[];
+   const linkedFact=matches.length===1&&validPrep(matches[0].item)?matches[0].item.fact:null;
+   const employee=String(r.employee||'').trim();
+   const cells=type==='preparation'
+     ? [r.id,dateShort(r.date),journalEmployeeCell(employee),escapeJournalText(r.batch),numberLabel(r.plan),displayValue(r.fact)]
+     :type==='welding'
+     ? [r.id,dateShort(r.date),journalEmployeeCell(employee),escapeJournalText(r.batch),numberLabel(r.need),linkedFact===null?'Не определена':numberLabel(linkedFact)]
+     :[r.id,dateShort(r.date),journalEmployeeCell(employee),numberLabel(r.plan,'док.'),numberLabel(r.fact,'док.')];
+   const firstNumeric=type==='documents'?3:4;
+   return `<tr data-record="${i}" data-filter-status="${state.kind}" data-filter-date="${r.date}" data-filter-employee="${encodeURIComponent(employee)}" tabindex="0" aria-label="Открыть запись ${escapeJournalText(r.id)}">${cells.map((cell,idx)=>`<td class="${idx===0?'name-cell':idx>=firstNumeric?'num':''}">${cell}</td>`).join('')}<td>${statusPill(state)}</td><td>${elIcon('chevron','row-next')}</td></tr>`;
  }).join('');
  return {heading,rows};
 }
 function sectionPage(type){
- const name=pages[type].short, data=normalRows(type);
+ const name=pages[type].short,data=normalRows(type);
  return `${productionAnalytics(type)}<div class="view-info-bar"><p>Показано записей: <strong id="journalCount">${records[type].length}</strong> из ${records[type].length}</p><button class="btn btn-primary" data-open="addRecord">${elIcon('plus')} Добавить запись</button></div>
-  <section class="panel view-table"><div class="table-toolbar"><strong>Журнал · ${name}</strong></div>
-   <div class="journal-filters" id="journalFilters" aria-label="Фильтры записей">
-     <div class="journal-filter-field"><label for="journalStatus">Состояние</label><select class="journal-filter-control" id="journalStatus"><option value="all">Все состояния</option><option value="good">Подтверждено</option><option value="warn">Требует внимания</option><option value="bad">Ошибка</option></select></div>
-     <div class="journal-filter-field"><label for="journalFrom">Дата от</label><input class="journal-filter-control" id="journalFrom" type="date"></div>
-     <div class="journal-filter-field"><label for="journalTo">Дата до</label><input class="journal-filter-control" id="journalTo" type="date"></div>
-     <button type="button" class="journal-filter-clear" id="journalFilterReset">Сбросить</button>
-   </div>
-   <div class="table-wrap"><table class="data-table" id="recordsTable"><thead><tr>${data.heading.map(title=>`<th>${title}</th>`).join('')}<th></th></tr></thead><tbody>${data.rows}<tr class="journal-empty-row hidden" id="journalEmpty"><td colspan="7">По выбранным фильтрам записей нет</td></tr></tbody></table></div>
-  </section>`;
+   <section class="panel view-table"><div class="table-toolbar"><strong>Журнал · ${name}</strong></div>
+    <div class="journal-filters" id="journalFilters" aria-label="Фильтры записей">
+      <div class="journal-filter-field"><label for="journalStatus">Состояние</label><select class="journal-filter-control" id="journalStatus"><option value="all">Все состояния</option><option value="good">Подтверждено</option><option value="warn">Требует внимания</option><option value="bad">Ошибка</option></select></div>
+      <div class="journal-filter-field"><label for="journalEmployee">Сотрудник</label><select class="journal-filter-control" id="journalEmployee">${journalEmployeeOptions(type)}</select></div>
+      <div class="journal-filter-field"><label for="journalFrom">Дата от</label><input class="journal-filter-control" id="journalFrom" type="date"></div>
+      <div class="journal-filter-field"><label for="journalTo">Дата до</label><input class="journal-filter-control" id="journalTo" type="date"></div>
+      <button type="button" class="journal-filter-clear" id="journalFilterReset">Сбросить</button>
+    </div>
+    <div class="table-wrap"><table class="data-table" id="recordsTable"><thead><tr>${data.heading.map(title=>`<th>${title}</th>`).join('')}<th></th></tr></thead><tbody>${data.rows}<tr class="journal-empty-row hidden" id="journalEmpty"><td colspan="${data.heading.length+1}">По выбранным фильтрам записей нет</td></tr></tbody></table></div>
+   </section>`;
 }
+
 function detailPair(label,value){return `<div class="detail-pair"><dt>${label}</dt><dd>${value}</dd></div>`;}
 function detailStat(label,value,hint='',extra=''){return `<div class="detail-stat"><span>${label}</span><strong class="${extra}">${value}</strong>${hint?`<small>${hint}</small>`:''}</div>`;}
 function recordDetailsPage(type,index){
@@ -311,11 +331,14 @@ function applyJournalFilters(){
  const table=$('#recordsTable');
  if(!table)return;
  const state=$('#journalStatus').value;
+ const employee=$('#journalEmployee').value;
  const from=$('#journalFrom').value;
  const to=$('#journalTo').value;
  let visibleCount=0;
  table.querySelectorAll('tbody tr[data-record]').forEach(row=>{
+  const employeeMatches=employee==='all'||(employee==='unassigned'?!row.dataset.filterEmployee:row.dataset.filterEmployee===employee);
   const visible=(state==='all'||row.dataset.filterStatus===state)
+    &&employeeMatches
     &&(!from||row.dataset.filterDate>=from)
     &&(!to||row.dataset.filterDate<=to);
   row.classList.toggle('hidden',!visible);
@@ -373,6 +396,7 @@ document.addEventListener('click',event=>{
  const act=event.target.closest('[data-action]');if(act){closeModal();showToast(act.dataset.action==='exportPreview'?'Экспорт ещё не подключён':act.dataset.action==='importPreview'?'Выбранные файлы не загружены: импорт ещё не подключён':'Изменения пока не сохраняются');return}
  if(event.target.closest('#journalFilterReset')){
   $('#journalStatus').value='all';
+  $('#journalEmployee').value='all';
   $('#journalFrom').value='';
   $('#journalTo').value='';
   applyJournalFilters();
