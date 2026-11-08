@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="detail.css">
   <link rel="stylesheet" href="role-views.css">
   <link rel="stylesheet" href="create-record.css">
+  <link rel="stylesheet" href="layout-polish.css">
 </head>
 <body>
   <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" class="svg-library">
@@ -84,9 +85,9 @@
       </header>
       <main class="main-content" id="mainContent">
         <div class="content-container">
-          <div class="page-heading"><div><div class="page-eyebrow">ОПЕРАЦИОННАЯ АНАЛИТИКА <span class="eyebrow-separator">/</span> ОБЩАЯ СВОДКА</div><h1 id="pageTitle">Обзор предприятия</h1><p id="pageDescription">Все ключевые показатели производства в одном месте.</p></div><div class="heading-actions"><div class="dropdown-wrap"><button class="btn btn-outline period-button" id="periodTrigger" aria-expanded="false"><svg class="ico"><use href="#i-calendar"/></svg><span id="periodLabel">Весь период</span><svg class="ico small-chevron"><use href="#i-down"/></svg></button><div class="dropdown-menu hidden" id="periodMenu" role="menu"><button data-period="Весь период" class="selected">Весь период</button><button data-period="Последние 7 дней">Последние 7 дней</button><button data-period="Последние 30 дней">Последние 30 дней</button><button data-period="Произвольный период">Произвольный период</button></div></div><button class="btn btn-primary" id="exportTrigger"><svg class="ico"><use href="#i-download"/></svg><span>Скачать отчёт</span></button></div></div>
+          <div class="page-heading"><div><h1 id="pageTitle">Обзор предприятия</h1><p id="pageDescription">Все ключевые показатели производства в одном месте.</p></div><div class="heading-actions"><div class="period-filter-inline" aria-label="Период отчётности"><label for="periodSelect">Период</label><select id="periodSelect" class="period-select" aria-label="Выбрать период"><option value="all">Весь период</option><option value="7">Последние 7 дней</option><option value="30">Последние 30 дней</option><option value="custom">Произвольный период</option></select><div id="periodCustomDates" class="period-custom-dates hidden"><label>С <input type="date" id="periodFrom"></label><label>По <input type="date" id="periodTo"></label></div></div><button class="btn btn-primary" id="exportTrigger"><svg class="ico"><use href="#i-download"/></svg><span>Скачать отчёт</span></button></div></div>
           <div id="pageBody"></div>
-          <footer class="main-footer"><span>© 2026 Петро Билдинг Системс</span></footer>
+          
         </div>
       </main>
     </div>
