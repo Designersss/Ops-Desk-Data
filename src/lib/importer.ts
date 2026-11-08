@@ -48,7 +48,54 @@ function isoDate(value:unknown):string {
  if(typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value))return value;
  throw new HttpError(422,'Неподдерживаемая дата в Excel');
 }
+/**
+ * The upload cap applies to compressed bytes. Bound ZIP central-directory claims
+ * before handing arbitrary XLSX content to a decompressor as an additional
+ * protection against tiny ZIP bombs and unsupported encrypted/ZIP64 archives.
+ * These checks do not replace resource limits on the deployment itself.
+ */
+export function validateXlsxArchive(buffer:Buffer):void{
+ const size=buffer.length;
+ if(size<22||size>2_000_000)throw new HttpError(413,'Размер XLSX не должен превышать 2 МБ');
+ let end=-1;
+ const min=Math.max(0,size-22-65535);
+ for(let pos=size-22;pos>=min;pos--){
+  if(buffer.readUInt32LE(pos)!==0x06054b50)continue;
+  const comment=buffer.readUInt16LE(pos+20);
+  if(pos+22+comment===size){end=pos;break;}
+ }
+ if(end<0)throw new HttpError(422,'Некорректный ZIP-контейнер XLSX');
+ const count=buffer.readUInt16LE(end+10);
+ const centralSize=buffer.readUInt32LE(end+12);
+ const centralOffset=buffer.readUInt32LE(end+16);
+ if(!count||count>500||count===0xffff||centralSize===0xffffffff||centralOffset===0xffffffff||centralOffset+centralSize>end){
+  throw new HttpError(422,'Недопустимый размер или структура XLSX');
+ }
+ let pos=centralOffset,total=0;
+ const stop=centralOffset+centralSize;
+ for(let i=0;i<count;i++){
+  if(pos+46>stop||buffer.readUInt32LE(pos)!==0x02014b50)throw new HttpError(422,'Повреждённая структура XLSX');
+  const flags=buffer.readUInt16LE(pos+8);
+  const compressed=buffer.readUInt32LE(pos+20);
+  const uncompressed=buffer.readUInt32LE(pos+24);
+  const nameLength=buffer.readUInt16LE(pos+28);
+  const extraLength=buffer.readUInt16LE(pos+30);
+  const commentLength=buffer.readUInt16LE(pos+32);
+  const next=pos+46+nameLength+extraLength+commentLength;
+  if(next>stop||compressed===0xffffffff||uncompressed===0xffffffff||(flags&0x1)!==0){
+   throw new HttpError(422,'Зашифрованный, ZIP64 или повреждённый XLSX не поддерживается');
+  }
+  total+=uncompressed;
+  if(uncompressed>25_000_000||total>50_000_000||(compressed===0&&uncompressed>0)||(compressed>0&&uncompressed/compressed>1000)){
+   throw new HttpError(413,'Файл XLSX слишком велик после распаковки');
+  }
+  pos=next;
+ }
+ if(pos!==stop)throw new HttpError(422,'Некорректный каталог ZIP-файла XLSX');
+}
+
 export async function parseWorkbook(section:Section,buffer:Buffer):Promise<RecordInput[]>{
+ validateXlsxArchive(buffer);
  const workbook=new ExcelJS.Workbook();
  try{await workbook.xlsx.load(buffer as unknown as Parameters<typeof workbook.xlsx.load>[0]);}
  catch{throw new HttpError(422,'Не удалось прочитать XLSX для участка '+section);}
