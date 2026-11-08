@@ -84,7 +84,7 @@ test('a one-time 3-file import replaces all records atomically and survives relo
  await page.goto('/settings/import');
  await expect(page.getByRole('heading',{name:'Импорт данных'})).toBeVisible();
  const inputFiles=page.locator('.import-file-choice input[type="file"]');
- expect(await inputFiles.count()).toBe(3);
+ await expect(inputFiles).toHaveCount(3);
  await inputFiles.nth(0).setInputFiles({name:'01_Заготовка.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:await workbook(['record_id','date','batch_id','employee','plan_qty','fact_qty'],['P-111',46300,'LOT-11','Ольга Алексеева',100,95])});
  await inputFiles.nth(1).setInputFiles({name:'02_Потребность_сварки.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:await workbook(['record_id','date','batch_id','need_qty'],['W-111',46300,'LOT-11',90])});
  await inputFiles.nth(2).setInputFiles({name:'03_Документация.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:await workbook(['record_id','date','employee','plan_docs','fact_docs'],['D-111',46300,'Олег Волков',5,5])});
