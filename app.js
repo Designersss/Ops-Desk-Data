@@ -168,15 +168,21 @@ function normalRows(type){
      : type==='welding'
      ? [r.id,dateShort(r.date),r.batch,numberLabel(r.need),linkedFact === null ? 'Не определена' : numberLabel(linkedFact)]
      : [r.id,dateShort(r.date),r.employee,numberLabel(r.plan,'док.'),numberLabel(r.fact,'док.')];
-   return `<tr data-record="${i}" tabindex="0" aria-label="Открыть запись ${r.id}">${cells.map((cell,idx)=>`<td class="${idx===0?'name-cell':idx===3||idx===4?'num':''}">${cell}</td>`).join('')}<td>${statusPill(state)}</td><td>${elIcon('chevron','row-next')}</td></tr>`;
+   return `<tr data-record="${i}" data-filter-status="${state.kind}" data-filter-date="${r.date}" tabindex="0" aria-label="Открыть запись ${r.id}">${cells.map((cell,idx)=>`<td class="${idx===0?'name-cell':idx===3||idx===4?'num':''}">${cell}</td>`).join('')}<td>${statusPill(state)}</td><td>${elIcon('chevron','row-next')}</td></tr>`;
  }).join('');
  return {heading,rows};
 }
 function sectionPage(type){
  const name=pages[type].short, data=normalRows(type);
- return `${productionAnalytics(type)}<div class="view-info-bar"><p>Всего записей: <strong>${records[type].length}</strong></p><button class="btn btn-primary" data-open="addRecord">${elIcon('plus')} Добавить запись</button></div>
-  <section class="panel view-table"><div class="table-toolbar"><strong>Журнал · ${name}</strong><div class="table-toolbar-actions"><button class="subtle-action" data-open="filters">${elIcon('filter')} Фильтры</button></div></div>
-   <div class="table-wrap"><table class="data-table" id="recordsTable"><thead><tr>${data.heading.map(title=>`<th>${title}</th>`).join('')}<th></th></tr></thead><tbody>${data.rows}</tbody></table></div>
+ return `${productionAnalytics(type)}<div class="view-info-bar"><p>Показано записей: <strong id="journalCount">${records[type].length}</strong> из ${records[type].length}</p><button class="btn btn-primary" data-open="addRecord">${elIcon('plus')} Добавить запись</button></div>
+  <section class="panel view-table"><div class="table-toolbar"><strong>Журнал · ${name}</strong></div>
+   <div class="journal-filters" id="journalFilters" aria-label="Фильтры записей">
+     <div class="journal-filter-field"><label for="journalStatus">Состояние</label><select class="journal-filter-control" id="journalStatus"><option value="all">Все состояния</option><option value="good">Подтверждено</option><option value="warn">Требует внимания</option><option value="bad">Ошибка</option></select></div>
+     <div class="journal-filter-field"><label for="journalFrom">Дата от</label><input class="journal-filter-control" id="journalFrom" type="date"></div>
+     <div class="journal-filter-field"><label for="journalTo">Дата до</label><input class="journal-filter-control" id="journalTo" type="date"></div>
+     <button type="button" class="journal-filter-clear" id="journalFilterReset">Сбросить</button>
+   </div>
+   <div class="table-wrap"><table class="data-table" id="recordsTable"><thead><tr>${data.heading.map(title=>`<th>${title}</th>`).join('')}<th></th></tr></thead><tbody>${data.rows}<tr class="journal-empty-row hidden" id="journalEmpty"><td colspan="7">По выбранным фильтрам записей нет</td></tr></tbody></table></div>
   </section>`;
 }
 function detailPair(label,value){return `<div class="detail-pair"><dt>${label}</dt><dd>${value}</dd></div>`;}
@@ -290,26 +296,55 @@ function renderPage(){
  $('#crumbCurrent').textContent=p.short;
  $('#crumbDetail').textContent=creating?'Добавить запись':detail?record.id:'';
  $('#crumbDetailWrap').classList.toggle('hidden',!(detail||creating));
- $('.page-eyebrow').innerHTML=`${isDirector()?p.eyebrow:'МОЙ УЧАСТОК'} <span class="eyebrow-separator">/</span> ${p.short.toUpperCase()}${creating?` <span class="eyebrow-separator">/</span> НОВАЯ ЗАПИСЬ`:detail?` <span class="eyebrow-separator">/</span> ЗАПИСЬ`:''}`;
  $('#pageBody').innerHTML=creating?createRecordPage(route.page):detail?recordDetailsPage(route.page,route.index):
    route.page==='overview'?overview():['preparation','welding','documents'].includes(route.page)?sectionPage(route.page):
    route.page==='quality'?qualityPage():route.page==='reports'?reportsPage():route.page==='import'?importPage():settingsPage();
  $('.heading-actions').classList.toggle('hidden',creating||detail||!['overview','reports'].includes(route.page));
+ $('#exportTrigger').classList.toggle('hidden',route.page!=='reports');
  document.title=`${creating?'Добавить запись — ':detail?record.id+' — ':''}${p.short} — Петро Билдинг Системс`;
  document.querySelectorAll('.nav-link').forEach(btn=>{const active=btn.dataset.page===(route.page==='import'?'settings':route.page);btn.classList.toggle('active',active);if(active)btn.setAttribute('aria-current','page');else btn.removeAttribute('aria-current')});
  $('#mainContent').scrollTop=0;
  $('#appShell').classList.remove('mobile-open');
 }
+
+function applyJournalFilters(){
+ const table=$('#recordsTable');
+ if(!table)return;
+ const state=$('#journalStatus').value;
+ const from=$('#journalFrom').value;
+ const to=$('#journalTo').value;
+ let visibleCount=0;
+ table.querySelectorAll('tbody tr[data-record]').forEach(row=>{
+  const visible=(state==='all'||row.dataset.filterStatus===state)
+    &&(!from||row.dataset.filterDate>=from)
+    &&(!to||row.dataset.filterDate<=to);
+  row.classList.toggle('hidden',!visible);
+  if(visible)visibleCount++;
+ });
+ $('#journalCount').textContent=String(visibleCount);
+ $('#journalEmpty').classList.toggle('hidden',visibleCount!==0);
+}
+function currentPeriodText(){
+ const el=$('#periodSelect');
+ const value=el.value;
+ if(value==='custom'){
+  const from=$('#periodFrom').value;
+  const to=$('#periodTo').value;
+  return from||to?`${from||'Начало'} — ${to||'Конец'}`:'Произвольный период';
+ }
+ return el.options[el.selectedIndex]?.textContent||'Весь период';
+}
+
 function showToast(msg){const box=$('#toast');box.textContent=msg;box.classList.add('show');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>box.classList.remove('show'),3200)}
 function openModal(kicker,title,body,actions){$('#modalKicker').textContent=kicker;$('#modalTitle').textContent=title;$('#modalBody').innerHTML=body;$('#modalActions').innerHTML=actions||`<button class="btn btn-primary" data-close="modal">Понятно</button>`;$('#modalOverlay').classList.remove('hidden');$('#modalOverlay').setAttribute('aria-hidden','false');$('#modalClose').focus();}
 function closeModal(){const modal=$('#modalOverlay');modal.classList.add('hidden');modal.setAttribute('aria-hidden','true')}
 function openIssue(i){if(!isDirector())return;const r=issueRows[i];if(!r)return;openModal('КАЧЕСТВО ДАННЫХ',r.title,`<div class="form-row"><span>Источник</span><strong>${r.sub.split(' · ')[0]}</strong></div><div class="form-row"><span>Запись</span><strong>${r.id}</strong></div><div class="form-row"><span>Влияние</span><strong style="max-width:210px;text-align:right">${r.impact}</strong></div>`,`<button class="btn btn-outline" data-close="modal">Закрыть</button><button class="btn btn-primary" data-open="editIssue">Исправить запись ${elIcon('chevron')}</button>`)}
 function openAction(action){if(!isDirector()&&['tableInfo','export','editIssue','importFiles'].includes(action))return;
  if(action==='tableInfo')openModal('МЕТОДОЛОГИЯ','Как читать показатели',`<p>Значения заготовки показаны только по подтверждённым записям. Некорректные факты исключены из достоверных расчётов.</p><p>Потребность сварки отображается отдельно. Если связанная партия заготовки ошибочна, обеспеченность нельзя считать определённой.</p><p>Документация не зависит от других участков.</p>`);
- else if(action==='export')openModal('ОТЧЁТНОСТЬ','Скачать отчёт',`<p>Выбранный период: <strong>${$('#periodLabel').textContent}</strong>.</p><label class="field-label" for="formatChoice">Формат файла</label><select class="form-input" id="formatChoice"><option>Excel (.xlsx)</option><option>CSV (.csv)</option></select>`,`<button class="btn btn-outline" data-close="modal">Отмена</button><button class="btn btn-primary" data-action="exportPreview">${elIcon('download')} Скачать отчёт</button>`);
+ else if(action==='export')openModal('ОТЧЁТНОСТЬ','Скачать отчёт',`<p>Выбранный период: <strong>${currentPeriodText()}</strong>.</p><label class="field-label" for="formatChoice">Формат файла</label><select class="form-input" id="formatChoice"><option>Excel (.xlsx)</option><option>CSV (.csv)</option></select>`,`<button class="btn btn-outline" data-close="modal">Отмена</button><button class="btn btn-primary" data-action="exportPreview">${elIcon('download')} Скачать отчёт</button>`);
  else if(action==='addRecord'){if(['preparation','welding','documents'].includes(currentPage))navigate(currentPage+'/new');}
  else if(action==='editIssue')openModal('РЕДАКТИРОВАНИЕ','Исправить значение',`<label class="field-label" for="issueValue">Новое значение</label><input class="form-input" id="issueValue" type="number" placeholder="Введите значение">`,`<button class="btn btn-outline" data-close="modal">Отмена</button><button class="btn btn-primary" data-action="savePreview">Сохранить</button>`);
- else if(action==='filters')openModal('ФИЛЬТРЫ','Фильтрация записей',`<label class="field-label">Состояние записи</label><select class="form-input"><option>Все состояния</option><option>Подтверждено</option><option>Требует проверки</option></select><label class="field-label">Период</label><select class="form-input"><option>Все даты</option><option>Текущий месяц</option></select>`,`<button class="btn btn-outline" data-close="modal">Отмена</button><button class="btn btn-primary" data-action="filterPreview">Применить</button>`);
+
  else if(action==='importFiles')openImportModal();
 }
 document.addEventListener('submit',event=>{
@@ -336,14 +371,29 @@ document.addEventListener('click',event=>{
  const open=event.target.closest('[data-open]');if(open){openAction(open.dataset.open);return}
  const close=event.target.closest('[data-close]');if(close){closeModal();return}
  const act=event.target.closest('[data-action]');if(act){closeModal();showToast(act.dataset.action==='exportPreview'?'Экспорт ещё не подключён':act.dataset.action==='importPreview'?'Выбранные файлы не загружены: импорт ещё не подключён':'Изменения пока не сохраняются');return}
- const period=event.target.closest('[data-period]');if(period){const text=period.dataset.period;if(text==='Произвольный период'){openModal('ПЕРИОД','Выбрать даты',`<label class="field-label">Начало периода</label><input type="date" class="form-input" value="2026-10-01" id="dateFrom"><label class="field-label">Конец периода</label><input type="date" class="form-input" value="2026-10-15" id="dateTo">`,`<button class="btn btn-outline" data-close="modal">Отмена</button><button class="btn btn-primary" data-action="periodPreview">Применить</button>`)}else{$('#periodLabel').textContent=text;$('#periodMenu').querySelectorAll('[data-period]').forEach(el=>el.classList.toggle('selected',el===period));showToast('Период выбран')}$('#periodMenu').classList.add('hidden');$('#periodTrigger').setAttribute('aria-expanded','false');return}
- if(event.target.id==='periodTrigger'||event.target.closest('#periodTrigger')){const menu=$('#periodMenu');menu.classList.toggle('hidden');$('#periodTrigger').setAttribute('aria-expanded',String(!menu.classList.contains('hidden')));return}
- if(!event.target.closest('#periodMenu')){$('#periodMenu').classList.add('hidden');$('#periodTrigger').setAttribute('aria-expanded','false')}
+ if(event.target.closest('#journalFilterReset')){
+  $('#journalStatus').value='all';
+  $('#journalFrom').value='';
+  $('#journalTo').value='';
+  applyJournalFilters();
+  return;
+ }
 });
-document.addEventListener('keydown',event=>{if(event.key==='Escape'){closeModal();closeRoleMenu();$('#periodMenu').classList.add('hidden')}if(event.key==='Enter'&&event.target.matches('[data-record],[data-issue],tr[data-go],article[data-go]'))event.target.click()});
+document.addEventListener('change',event=>{
+ if(event.target.closest('#journalFilters'))applyJournalFilters();
+ if(event.target.id==='periodSelect'){
+  $('#periodCustomDates').classList.toggle('hidden',event.target.value!=='custom');
+ }
+});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'){closeModal();closeRoleMenu()}if(event.key==='Enter'&&event.target.matches('[data-record],[data-issue],tr[data-go],article[data-go]'))event.target.click()});
 $('#mobileMenu').addEventListener('click',()=>$('#appShell').classList.toggle('mobile-open'));
 $('#mobileBackdrop').addEventListener('click',()=>$('#appShell').classList.remove('mobile-open'));
-$('#collapseBtn').addEventListener('click',()=>$('#appShell').classList.toggle('collapsed'));
+$('#collapseBtn').addEventListener('click',()=>{
+ const collapsed=$('#appShell').classList.toggle('collapsed');
+ const label=collapsed?'Развернуть меню':'Свернуть меню';
+ $('#collapseBtn').setAttribute('aria-label',label);
+ $('#collapseBtn').setAttribute('title',label);
+});
 $('#modalOverlay').addEventListener('click',event=>{if(event.target.id==='modalOverlay')closeModal()});
 $('#modalClose').addEventListener('click',closeModal);
 $('#exportTrigger').addEventListener('click',()=>openAction('export'));
