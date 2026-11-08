@@ -45,10 +45,16 @@ export class OperationsAnalyzer {
     const goodPrep=prep.filter(good);
     const goodDocs=docs.filter(good);
     const goodWeld=weld.filter(good);
+    // The report period selects welding demand, not the lifetime of its source batch.
+    // Preparation may have been completed on an earlier day. Resolve both sides
+    // against the complete dataset, but only aggregate requests in the period.
     const prepByBatch=new Map<string,ProductionRecord[]>();
-    for(const r of prep){if(!r.batchId)continue;prepByBatch.set(r.batchId,[...(prepByBatch.get(r.batchId)||[]),r]);}
     const weldByBatch=new Map<string,ProductionRecord[]>();
-    for(const r of weld){if(!r.batchId)continue;weldByBatch.set(r.batchId,[...(weldByBatch.get(r.batchId)||[]),r]);}
+    for(const row of all){
+      if(!row.batchId)continue;
+      const map=row.section==='preparation'?prepByBatch:row.section==='welding'?weldByBatch:null;
+      if(map)map.set(row.batchId,[...(map.get(row.batchId)||[]),row]);
+    }
 
     const enriched:RecordView[]=selected.map(row=>{
       const issues=baseIssues.get(row.id)||[];
