@@ -145,7 +145,7 @@ export function PbsApp(){
   ['/', 'Обзор',LayoutDashboard],['/quality','Качество данных',ShieldAlert],['/reports','Отчёты',BarChart3]
  ];
  const productionItems:[Section,typeof FileSpreadsheet][]=[['preparation',FileSpreadsheet],['welding',Wrench],['documents',Files]];
- const currentRecord=route.section&&route.id&&data?.rows.find(row=>row.id===route.id&&row.section===route.section);
+ const currentRecord=route.section&&typeof route.id==='number'?data?.rows.find(row=>row.id===route.id&&row.section===route.section):undefined;
  const scopedRows=route.section?data?.rows.filter(row=>row.section===route.section)||[]:[];
  const department=route.section?(role==='director'?data?.metrics?.[route.section]||null:data?.department||null):null;
  const periodVisible=role==='director'&&(route.kind==='overview'||route.kind==='reports');
