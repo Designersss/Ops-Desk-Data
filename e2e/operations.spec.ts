@@ -1,0 +1,127 @@
+import {test,expect} from '@playwright/test';
+import ExcelJS from 'exceljs';
+import {mkdir,readFile} from 'node:fs/promises';
+
+test.describe.configure({mode:'serial'});
+const pin='111111';
+async function asDirector(page:import('@playwright/test').Page){
+ const response=await page.request.post('/api/session',{data:{role:'director',pin}});
+ expect(response.status()).toBe(200);
+}
+test('CEO correction updates dashboard, related welding and downloadable report; reload preserves it',async({page})=>{
+ await asDirector(page);
+ await page.goto('/');
+ await expect(page.getByRole('heading',{name:'Обзор предприятия'})).toBeVisible();
+ await expect(page.getByText('72,5%',{exact:false}).first()).toBeVisible();
+ await page.goto('/quality');
+ await expect(page.getByRole('heading',{name:'Качество данных'})).toBeVisible();
+ await page.getByRole('button',{name:/P-003/}).first().click();
+ await expect(page).toHaveURL(/\/production\/preparation\/record\/\d+/);
+ await page.getByRole('button',{name:/Редактировать запись/}).click();
+ await page.getByRole('spinbutton',{name:/Факт, ед./}).fill('120');
+ await page.getByRole('button',{name:/Сохранить изменения/}).click();
+ await expect(page.getByText('Запись обновлена, показатели пересчитаны')).toBeVisible();
+ await page.goto('/');
+ await expect(page.getByText('82%',{exact:false}).first()).toBeVisible();
+ await expect(page.getByText('18 из 26 документов',{exact:false})).toBeVisible();
+ await page.goto('/production/welding');
+ await expect(page.getByRole('heading',{name:'Потребность сварки'})).toBeVisible();
+ await page.goto('/reports');
+ const downloadPromise=page.waitForEvent('download');
+ await page.getByRole('link',{name:/Скачать отчёт CSV/}).click();
+ const download=await downloadPromise;
+ expect(download.suggestedFilename()).toMatch(/pbs-report.*\.csv/);
+ const path=await download.path();
+ expect(path).not.toBeNull();
+ const csv=await readFile(path!,'utf8');
+ expect(csv).toContain('P-003');
+ expect(csv).toContain('120');
+ expect(csv.charCodeAt(0)).toBe(65279);
+ await page.reload();
+ await expect(page.getByRole('heading',{name:'Отчёты'})).toBeVisible();
+ await mkdir('test-artifacts',{recursive:true});
+ await page.goto('/');
+ await page.screenshot({path:'test-artifacts/pbs-desktop.png',fullPage:true});
+ const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
+ expect(overflow).toBe(false);
+});
+test('employee gets only their own area and mobile navigation does not overflow',async({page})=>{
+ await asDirector(page);
+ await page.goto('/');
+ await page.getByRole('button',{name:/Выбрать режим работы/}).click();
+ await page.getByRole('option',{name:/Сотрудник · Заготовка/}).click();
+ await page.locator('.pin-dialog input[type="password"]').fill('222222');
+ await page.getByRole('button',{name:'Продолжить'}).click();
+ await expect(page).toHaveURL(/\/production\/preparation/);
+ await expect(page.getByRole('heading',{name:'Заготовка'})).toBeVisible();
+ expect(await page.getByRole('button',{name:'Отчёты'}).count()).toBe(0);
+ const state=await page.request.get('/api/state');
+ expect(state.status()).toBe(200);
+ const json=await state.json();
+ expect(json.metrics).toBeNull();
+ expect(json.rows.every((r:{section:string})=>r.section==='preparation')).toBe(true);
+ await page.goto('/production/documents');
+ await expect(page).toHaveURL(/\/production\/preparation$/);
+ await page.setViewportSize({width:390,height:844});
+ await expect(page.getByRole('button',{name:'Открыть меню'})).toBeVisible();
+ await page.getByRole('button',{name:'Открыть меню'}).click();
+ await expect(page.getByRole('button',{name:'Заготовка'})).toBeVisible();
+ await page.getByRole('button',{name:'Заготовка'}).click();
+ await mkdir('test-artifacts',{recursive:true});
+ await page.screenshot({path:'test-artifacts/pbs-mobile.png',fullPage:true});
+ const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
+ expect(overflow).toBe(false);
+});
+test('CEO sees updates from an employee on another device without manually reloading',async({browser})=>{
+ const directorContext=await browser.newContext({baseURL:'http://127.0.0.1:3000'});
+ const employeeContext=await browser.newContext({baseURL:'http://127.0.0.1:3000'});
+ try{
+  const director=await directorContext.newPage();
+  const employee=await employeeContext.newPage();
+  await asDirector(director);
+  await director.goto('/');
+  await expect(director.getByText('18 из 26 документов',{exact:false})).toBeVisible();
+  const login=await employee.request.post('/api/session',{data:{role:'documents',pin:'444444'}});
+  expect(login.status()).toBe(200);
+  const response=await employee.request.get('/api/state');
+  expect(response.status()).toBe(200);
+  const state=await response.json();
+  const row=state.rows.find((r:{recordKey:string})=>r.recordKey==='D-001');
+  expect(row).toBeTruthy();
+  const updated=await employee.request.patch('/api/records/'+row.id,{data:{
+   version:row.version,
+   record:{section:'documents',recordKey:row.recordKey,date:row.date,employee:row.employee,plan:row.plan,fact:5}
+  }});
+  expect(updated.status()).toBe(200);
+  await expect(director.getByText('19 из 26 документов',{exact:false})).toBeVisible({timeout:25_000});
+ }finally{
+  await directorContext.close();
+  await employeeContext.close();
+ }
+});
+async function workbook(headers:string[],values:unknown[]){
+ const book=new ExcelJS.Workbook();
+ const sheet=book.addWorksheet('Данные');
+ sheet.addRow(headers);
+ sheet.addRow(values as ExcelJS.CellValue[]);
+ return Buffer.from(await book.xlsx.writeBuffer());
+}
+test('a one-time 3-file import replaces all records atomically and survives reload without Excel',async({page})=>{
+ await asDirector(page);
+ await page.goto('/settings/import');
+ await expect(page.getByRole('heading',{name:'Импорт данных'})).toBeVisible();
+ const inputFiles=page.locator('.import-file-choice input[type="file"]');
+ await expect(inputFiles).toHaveCount(3);
+ await inputFiles.nth(0).setInputFiles({name:'01_Заготовка.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:await workbook(['record_id','date','batch_id','employee','plan_qty','fact_qty'],['P-111',46300,'LOT-11','Ольга Алексеева',100,95])});
+ await inputFiles.nth(1).setInputFiles({name:'02_Потребность_сварки.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:await workbook(['record_id','date','batch_id','need_qty'],['W-111',46300,'LOT-11',90])});
+ await inputFiles.nth(2).setInputFiles({name:'03_Документация.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:await workbook(['record_id','date','employee','plan_docs','fact_docs'],['D-111',46300,'Олег Волков',5,5])});
+ await page.getByRole('checkbox').check();
+ await page.getByRole('button',{name:'Импортировать данные'}).click();
+ await expect(page).toHaveURL('/');
+ await expect(page.getByText('95%',{exact:false}).first()).toBeVisible();
+ await page.reload();
+ await expect(page.getByText('95%',{exact:false}).first()).toBeVisible();
+ await page.goto('/production/preparation');
+ await expect(page.getByText('P-111')).toBeVisible();
+ await expect(page.getByText('P-003')).toHaveCount(0);
+});

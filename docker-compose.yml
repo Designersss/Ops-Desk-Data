@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: pbs
+      POSTGRES_PASSWORD: pbs_local
+      POSTGRES_DB: pbs
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pbs -d pbs"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - pbs_postgres_data:/var/lib/postgresql/data
+volumes:
+  pbs_postgres_data:

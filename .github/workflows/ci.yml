@@ -1,0 +1,74 @@
+name: PBS quality checks
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: pbs
+          POSTGRES_PASSWORD: pbs_local
+          POSTGRES_DB: pbs
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U pbs -d pbs"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=10
+    env:
+      DATABASE_URL: postgresql://pbs:pbs_local@127.0.0.1:5432/pbs
+      SESSION_SECRET: github-actions-test-only-secret-not-used-in-production-123456
+      NEXT_TELEMETRY_DISABLED: '1'
+      INTEGRATION_TEST_DB: '1'
+      DIRECTOR_PIN: '111111'
+      PREPARATION_PIN: '222222'
+      WELDING_PIN: '333333'
+      DOCUMENTS_PIN: '444444'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10.21.0'
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install
+        run: pnpm install --no-frozen-lockfile
+      - name: Database migration
+        run: pnpm db:migrate
+      - name: Initial import/seed
+        run: pnpm db:seed
+      - name: Unit and PostgreSQL integration tests
+        run: pnpm test
+      - name: TypeScript
+        run: pnpm typecheck
+      - name: Production build
+        run: pnpm build
+      - name: Install Chromium for E2E
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Start Next.js server
+        run: |
+          pnpm start --hostname 127.0.0.1 > /tmp/pbs-next.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/pbs-next.log
+          exit 1
+      - name: Browser E2E scenarios
+        run: pnpm test:e2e
+      - name: Upload browser screenshots and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pbs-browser-artifacts
+          path: |
+            test-artifacts/
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
