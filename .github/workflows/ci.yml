@@ -26,20 +26,22 @@ jobs:
       INTEGRATION_TEST_DB: '1'
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10.21.0'
+          run_install: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: package.json
       - name: Install
-        run: npm install --no-audit --no-fund
+        run: pnpm install --no-frozen-lockfile
       - name: Database migration
-        run: npm run db:migrate
+        run: pnpm db:migrate
       - name: Initial import/seed
-        run: npm run db:seed
+        run: pnpm db:seed
       - name: Unit and PostgreSQL integration tests
-        run: npm test
+        run: pnpm test
       - name: TypeScript
-        run: npm run typecheck
+        run: pnpm typecheck
       - name: Production build
-        run: npm run build
+        run: pnpm build
