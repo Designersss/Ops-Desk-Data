@@ -31,6 +31,26 @@ describe('PBS cross-section and data quality',()=>{
   expect(result.find(row=>row.recordKey==='W-003')?.coverage).toMatchObject({confirmedFact:120,covered:120,shortage:10});
   expect(metrics.documents).toMatchObject({plan:26,fact:18,percent:69.23});
  });
+ it('resolves a welding request against preparation from an earlier date',()=>{
+  const rows=fixture();
+  const w001=rows.find(row=>row.recordKey==='W-001');
+  if(!w001)throw new Error('Missing W-001');
+  w001.date='2026-10-06';
+  const {rows:result,metrics}=new OperationsAnalyzer().analyze(rows,{from:'2026-10-06',to:'2026-10-06'});
+  expect(metrics.preparation).toMatchObject({plan:100,fact:100,percent:100});
+  expect(metrics.welding).toMatchObject({need:200,confirmedNeed:200,covered:180,shortage:20,linkedCount:2});
+  expect(result.find(row=>row.recordKey==='W-001')?.coverage).toMatchObject({confirmedFact:90,covered:90,shortage:20});
+  expect(result.some(row=>row.recordKey==='P-001')).toBe(false);
+ });
+ it('does not trust an erroneous source outside the filtered period',()=>{
+  const rows=fixture();
+  const w003=rows.find(row=>row.recordKey==='W-003');
+  if(!w003)throw new Error('Missing W-003');
+  w003.date='2026-10-06';
+  const {rows:result}=new OperationsAnalyzer().analyze(rows,{from:'2026-10-06',to:'2026-10-06'});
+  expect(result.find(row=>row.recordKey==='W-003')?.coverage?.confirmedFact).toBeNull();
+  expect(result.find(row=>row.recordKey==='W-003')?.status).toBe('unconfirmed');
+ });
  it('detects duplicate original rows; removing a duplicate makes remaining valid',()=>{
   const rows=fixture();
   const duplicate=rows.filter(row=>row.recordKey==='P-005');
