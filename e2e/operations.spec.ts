@@ -72,6 +72,33 @@ test('employee gets only their own area and mobile navigation does not overflow'
  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
  expect(overflow).toBe(false);
 });
+test('CEO sees updates from an employee on another device without manually reloading',async({browser})=>{
+ const directorContext=await browser.newContext({baseURL:'http://127.0.0.1:3000'});
+ const employeeContext=await browser.newContext({baseURL:'http://127.0.0.1:3000'});
+ try{
+  const director=await directorContext.newPage();
+  const employee=await employeeContext.newPage();
+  await asDirector(director);
+  await director.goto('/');
+  await expect(director.getByText('18 из 26 документов',{exact:false})).toBeVisible();
+  const login=await employee.request.post('/api/session',{data:{role:'documents',pin:'444444'}});
+  expect(login.status()).toBe(200);
+  const response=await employee.request.get('/api/state');
+  expect(response.status()).toBe(200);
+  const state=await response.json();
+  const row=state.rows.find((r:{recordKey:string})=>r.recordKey==='D-001');
+  expect(row).toBeTruthy();
+  const updated=await employee.request.patch('/api/records/'+row.id,{data:{
+   version:row.version,
+   record:{section:'documents',recordKey:row.recordKey,date:row.date,employee:row.employee,plan:row.plan,fact:5}
+  }});
+  expect(updated.status()).toBe(200);
+  await expect(director.getByText('19 из 26 документов',{exact:false})).toBeVisible({timeout:25_000});
+ }finally{
+  await directorContext.close();
+  await employeeContext.close();
+ }
+});
 async function workbook(headers:string[],values:unknown[]){
  const book=new ExcelJS.Workbook();
  const sheet=book.addWorksheet('Данные');
