@@ -52,3 +52,18 @@ html,body{height:100%}
  .journal-filter-field{flex:1 1 100%}
  .journal-filter-clear{width:100%}
 }
+
+/* Сотрудник в производственных журналах: ограничение длины только визуальное. */
+.journal-employee-name{
+ display:block;
+ width:154px;
+ max-width:100%;
+ min-width:0;
+ white-space:nowrap;
+ overflow:hidden;
+ text-overflow:ellipsis;
+ color:#445648;
+ font-weight:700;
+}
+tr[data-filter-employee=""] .journal-employee-name{color:#9aa79d;font-weight:550}
+@media(max-width:760px){.journal-employee-name{width:132px}}
