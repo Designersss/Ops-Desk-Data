@@ -50,7 +50,7 @@ test('employee gets only their own area and mobile navigation does not overflow'
  await page.goto('/');
  await page.getByRole('button',{name:/Выбрать режим работы/}).click();
  await page.getByRole('option',{name:/Сотрудник · Заготовка/}).click();
- await page.getByRole('textbox',{name:'PIN'}).fill('222222');
+ await page.locator('.pin-dialog input[type="password"]').fill('222222');
  await page.getByRole('button',{name:'Продолжить'}).click();
  await expect(page).toHaveURL(/\/production\/preparation/);
  await expect(page.getByRole('heading',{name:'Заготовка'})).toBeVisible();
