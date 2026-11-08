@@ -1,5 +1,5 @@
 'use client';
-import {useCallback,useEffect,useMemo,useState} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {usePathname,useRouter} from 'next/navigation';
 import {AlertCircle,BarChart3,ChevronDown,ChevronRight,Database,FileSpreadsheet,Files,LayoutDashboard,Menu,PanelLeftClose,PanelLeftOpen,Settings2,ShieldAlert,Wrench,X} from 'lucide-react';
 import {api,jsonRequest,ApiError} from '@/lib/client';
@@ -54,6 +54,7 @@ export function PbsApp(){
  const [busy,setBusy]=useState(false);
  const [notice,setNotice]=useState('');
  const [revision,setRevision]=useState(0);
+ const lastFetchKey=useRef<string>('');
  const [period,setPeriod]=useState('all');
  const [dateFrom,setDateFrom]=useState('');
  const [dateTo,setDateTo]=useState('');
@@ -74,13 +75,19 @@ export function PbsApp(){
  },[role,route.kind,route.section,router]);
  useEffect(()=>{
   if(!sessionReady)return;
-  if(!role){setData(null);setLoading(false);return;}
+  if(!role){setData(null);setLoading(false);lastFetchKey.current='';return;}
   const selected=(route.kind==='overview'||route.kind==='reports');
   const query=new URLSearchParams();
   if(selected&&range.from)query.set('from',range.from);
   if(selected&&range.to)query.set('to',range.to);
   let active=true;
-  setLoading(true);setDataError('');
+  // Silent background refreshes must not replace the dashboard with a spinner.
+  const fetchKey=[role,route.kind,route.section??'',range.from??'',range.to??''].join('|');
+  if(lastFetchKey.current!==fetchKey){
+   lastFetchKey.current=fetchKey;
+   setLoading(true);
+  }
+  setDataError('');
   api<LiveState>('/api/state'+(query.size?'?'+query.toString():'')).then(result=>{
    if(active){setData(result);setLoading(false);}
   }).catch(error=>{
@@ -88,6 +95,14 @@ export function PbsApp(){
   });
   return ()=>{active=false;};
  },[role,sessionReady,route.kind,route.section,range.from,range.to,revision]);
+
+ // A second device may modify the shared database while this dashboard is open.
+ // Keep the visible data current without requiring manual reload or a websocket.
+ useEffect(()=>{
+  if(!sessionReady||!role)return;
+  const interval=window.setInterval(refresh,8000);
+  return ()=>window.clearInterval(interval);
+ },[sessionReady,role,refresh]);
 
  const switchRole=async(target:Role,pin='')=>{
   if(pinRequired&&!pin){setRoleTarget(target);setRolePin('');setRoleError('');setRoleMenu(false);return;}
