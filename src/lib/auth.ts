@@ -49,5 +49,10 @@ export function authenticateRole(role:Role,pin:string):boolean{
 export function sameOrigin(request:Request):boolean{
  const origin=request.headers.get('origin');
  if(!origin)return true;
- try{return new URL(origin).host===new URL(request.url).host;}catch{return false;}
+ try{
+  // Next.js may reconstruct Request.url with an internal hostname behind a reverse proxy.
+  // Compare the browser Origin with the actual Host that reached the application.
+  const requestHost=request.headers.get('host')||new URL(request.url).host;
+  return new URL(origin).host.toLowerCase()===requestHost.toLowerCase();
+ }catch{return false;}
 }
