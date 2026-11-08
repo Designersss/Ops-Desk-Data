@@ -34,5 +34,6 @@
     "tsx": "^4.20.6",
     "vitest": "^4.0.8",
     "dotenv": "^17.2.3"
-  }
+  },
+  "packageManager": "pnpm@10.21.0"
 }
