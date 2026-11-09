@@ -14,8 +14,11 @@ cd Ops-Desk-Data
 corepack enable
 corepack prepare pnpm@10.21.0 --activate
 pnpm install
-cp .env.example .env
+# Создать .env только при первом запуске — не перезаписывать действующие настройки.
+test -f .env || cp .env.example .env
+# Убедитесь, что Docker Desktop запущен.
 docker compose up -d
+docker compose ps
 pnpm db:migrate
 pnpm db:seed
 pnpm dev
@@ -26,6 +29,43 @@ pnpm dev
 В файле `.env` укажите актуальный `DATABASE_URL` при использовании внешнего PostgreSQL; `.env` не нужно коммитить.
 
 Для производственного запуска: `pnpm build && pnpm start`. Предварительно настройте миграции, БД и переменные окружения.
+
+
+### Если данные не загружаются (PostgreSQL)
+
+При ошибке сайта «Не удалось загрузить данные» сначала посмотрите **терминал, в котором запущен Next.js**, и статус базы:
+
+```bash
+docker compose ps
+docker compose logs --tail=40 postgres
+```
+
+В локальной установке проекта PostgreSQL открывается на **127.0.0.1:55432** (в контейнере используется 5432). Это намеренно позволяет работать рядом с другими установленными PostgreSQL, которые обычно занимают порт 5432.
+
+Если вы запускали предыдущую версию проекта и файл **`.env` уже существует**, откройте его и замените:
+
+```dotenv
+DATABASE_URL=postgresql://pbs:pbs_local@127.0.0.1:55432/pbs
+PBS_DB_PORT=55432
+```
+
+Изменять `.env.example` недостаточно: приложение читает существующий локальный `.env`. После этого выполните:
+
+```bash
+# Docker Desktop должен быть запущен
+docker compose up -d --force-recreate postgres
+docker compose ps
+docker compose exec -T postgres pg_isready -U pbs -d pbs
+pnpm db:migrate
+pnpm db:seed
+pnpm dev
+```
+
+При работающем PostgreSQL `docker compose ps` показывает контейнер как `Up (healthy)`, а `pg_isready` сообщает, что сервер принимает соединения. Если порт **55432** также занят, выберите свободный порт и укажите **одинаковое значение** в `PBS_DB_PORT` и в порте `DATABASE_URL`.
+
+Ошибка `Bind ... port is already allocated` означает конфликт опубликованного порта на компьютере. Ошибка PostgreSQL `28P01 password authentication failed` часто означает, что `DATABASE_URL` указывает не на контейнер PBS, а на другой сервер с другими учётными данными.
+
+**Не используйте `docker compose down -v`, `docker volume prune` или `pnpm db:reset` для устранения ошибки подключения:** это может удалить сохранённые данные. Если после смены порта возникает ошибка аутентификации, проверьте, какой контейнер работает, и содержимое `DATABASE_URL`, не публикуя пароль.
 
 ## Общие данные для разных устройств
 
