@@ -1,9 +1,10 @@
+# Локальный порт вынесен из 5432, чтобы не конфликтовать с другими PostgreSQL.
 services:
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${PBS_DB_PORT:-55432}:5432"
     environment:
       POSTGRES_USER: pbs
       POSTGRES_PASSWORD: pbs_local
